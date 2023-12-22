@@ -1,0 +1,20 @@
+body {
+    background-color: rgb(255, 255, 255);
+  }
+  
+h1,h2,h3, p{
+  color:rgb(9, 64, 140);
+}
+ p{
+  color:hsl(0, 46%, 56%);
+}
+
+#myChart
+{
+  background-color:lightblue;
+}
+
+a
+{
+  background-color:white;
+}
