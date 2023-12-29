@@ -1,20 +1,26 @@
 body {
-    background-color: rgb(255, 255, 255);
-  }
-  
-h1,h2,h3, p{
-  color:rgb(9, 64, 140);
-}
- p{
-  color:hsl(0, 46%, 56%);
+  background-color: rgb(255, 255, 255);
+  font-family: "Exo", sans-serif;
 }
 
-#myChart
-{
-  background-color:lightblue;
+h1,
+h2 {
+  color: #3b5d9e; /* Red color (replace with your desired color code) */
 }
 
-a
-{
-  background-color:white;
+/* Define color for h3 */
+h3 {
+  color: #8b1f40; /* Green color (replace with your desired color code) */
+}
+
+p {
+  color: hsl(0, 39%, 23%);
+}
+
+#myChart {
+  background-color: lightblue;
+}
+
+a {
+  background-color: white;
 }

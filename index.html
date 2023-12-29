@@ -4,21 +4,54 @@
 <head>
     <title>Quick Tool Resurection</title>
     <link rel="stylesheet" href="style.css" type="text/css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Exo:wght@400&display=swap" rel="stylesheet">
 </head>
 
-<body onload="init()">
+<!--<body onload="init()"> -->
+
+<body>
+
+    <h1>WEBICITO</h1>
+    <p>Edit layers with mouse</p>
+
+
     <h3>TIME</h3>
-    <p>edit layers with mouse</p>
     <canvas id="canvasTime" width=auto height="100"></canvas>
 
     <h3>DEPTH</h3>
-    <p>edit layers with mouse</p>
     <canvas id="canvasDepth" width=auto height="100"></canvas>
 
+    <label for="hcSelectorA">Hydrocarbons A:</label>
+    <select id="hcSelectorA">
+        <option value="none">None</option>
+        <option value="oil">Oil</option>
+        <option value="gas">Gas</option>
+        <option value="oil_gas">Oil & Gas</option>
+    </select>
+    <p> </p>
+    <label for="hcSelectorB">Hydrocarbons B:</label>
+    <select id="hcSelectorB">
+        <option value="none">None</option>
+        <option value="oil">Oil</option>
+        <option value="gas">Gas</option>
+        <option value="oil_gas">Oil & Gas</option>
+    </select>
+
+    <script type="module">
+
+        import { changedHydrocarbon } from './script.js';
+        document.getElementById("hcSelectorA").addEventListener("change", changedHydrocarbon);
+        document.getElementById("hcSelectorB").addEventListener("change", changedHydrocarbon);
+    </script>
+
+
     <p id="demo"></p>
-   // <script type="module" src="ZLoc.js"></script>
-    <script type="module" src="script.js"></script>
-    
+
+
+    <!-- <script type="module" src="ZLoc.js"></script> -->
+
 </body>
 
 </html>
