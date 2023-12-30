@@ -55,6 +55,8 @@ export class Layer {
     this.point = Array.from({ length }, (_) => new ZLoc(initDepth, initDepth));
     this.index = -1;
     this.velocityLayer = this;
+
+    this.taper = new Array(1).fill(0.0);
   }
 
   convertToScreenY(domain, height, minZ, maxZ) {
@@ -89,6 +91,80 @@ export class Layer {
       for (let i = 0; i < this.length; i++) {
         this.point[i].time = value;
       }
+    }
+  }
+
+  snapShot(domain) {
+    const n = this.length;
+    const z = new Array(n).fill(0.0);
+    if (domain == Domain.DomDepth) {
+      for (let i = 0; i < n; i++) z[i] = this.point[i].depth;
+    } else {
+      for (let i = 0; i < n; i++) z[i] = this.point[i].time;
+    }
+    return z;
+  }
+
+  calcTaper(taperW) {
+    const fs = new Array(taperW).fill(0.0);
+    const k = 8;
+    const A0 = 1 / (1 + Math.exp(-k * (0 - 0.5)));
+    const A1 = 1 / (1 + Math.exp(-k * (1 - 0.5)));
+    const B0 = A1 - A0;
+    for (let i = 0; i < taperW; i++) {
+      var t = i / (taperW - 1);
+      var A = 1 / (1 + Math.exp(-k * (t - 0.5)));
+      var B = A1 - A;
+      var C = 1 - B / B0;
+      fs[i] = C;
+    }
+    return fs;
+  }
+
+  overwriteRange(domain, inputZ, i0, i1, taperW) {
+    if (this.taper.length != taperW) this.taper = this.calcTaper(taperW);
+
+    if (domain == Domain.DomDepth) {
+      for (let i = i0; i <= i1; i++) this.point[i].depth = inputZ[i];
+
+      // tapering
+
+      for (let i = 1; i < taperW; i++) {
+        var f = this.taper[i];
+        console.log(f);
+        var ia = i1 + i;
+        if (ia < this.length) {
+          this.point[ia].depth =
+            f * this.point[ia].depth + (1 - f) * inputZ[ia];
+        }
+        ia = i0 - i;
+        if (ia >= 0) {
+          this.point[ia].depth =
+            f * this.point[ia].depth + (1 - f) * inputZ[ia];
+        }
+      }
+    } else {
+      for (let i = i0; i <= i1; i++) this.point[i].time = inputZ[i];
+      for (let i = 1; i < taperW; i++) {
+        var f = this.taper[i];
+
+        var ia = i1 + i;
+        if (ia < this.length) {
+          this.point[ia].time = f * this.point[ia].time + (1 - f) * inputZ[ia];
+        }
+        ia = i0 - i;
+        if (ia >= 0) {
+          this.point[ia].time = f * this.point[ia].time + (1 - f) * inputZ[ia];
+        }
+      }
+    }
+  }
+
+  overwrite(domain, inputZ) {
+    if (domain == Domain.DomDepth) {
+      for (let i = 0; i < this.length; i++) this.point[i].depth = inputZ[i];
+    } else {
+      for (let i = 0; i < this.length; i++) this.point[i].time = inputZ[i];
     }
   }
 }
@@ -208,11 +284,11 @@ export class USection {
     return null;
   }
 
-  moveContact(editLayer, rZ, idx, restrictBelow) {
+  adjustContactDepth(editLayer, rZ, idx, restrictBelow) {
     editLayer.contactControlDepth = rZ;
     editLayer.contactControlIndex = idx;
 
-    console.log("moveContact: " + editLayer.name + " : " + rZ + " " + idx);
+    //console.log("moveContact: " + editLayer.name + " : " + rZ + " " + idx);
     let layerA = this.getVisibleLayerAbove(editLayer);
     let layerB = this.getVisibleLayerBelow(editLayer);
 
@@ -263,10 +339,9 @@ export class USection {
   }
 
   flattenContacts() {
-    console.log("flatten");
     this.layers.forEach((layer) => {
       if (layer.isContact && layer.visible) {
-        this.moveContact(
+        this.adjustContactDepth(
           layer,
           layer.contactControlDepth,
           layer.contactControlIndex,
@@ -274,6 +349,11 @@ export class USection {
         );
       }
     });
+  }
+
+  update_From(domain) {
+    if (domain == Domain.DomDepth) this.update_TimeFromDepth(null);
+    else this.update_DepthFromTime(null);
   }
 
   update_TimeFromDepth(finalLayer) {
@@ -380,19 +460,19 @@ export class USection {
     }
   }
 
-  setupQuickTimeToDepth(layer) {
+  setupQuickTimeToDepth(layer, idx) {
     var layerA = this.getVisibleLayerAbove(layer);
 
-    var idx = layerA.point.reduce(
-      (minIndex, currentElement, currentIndex, array) => {
-        if (currentElement.t < array[minIndex].time) {
-          return currentIndex;
-        } else {
-          return minIndex;
-        }
-      },
-      0
-    );
+    // var idx = layerA.point.reduce(
+    //   (minIndex, currentElement, currentIndex, array) => {
+    //     if (currentElement.t < array[minIndex].time) {
+    //       return currentIndex;
+    //     } else {
+    //       return minIndex;
+    //     }
+    //   },
+    //   0
+    // );
 
     this.quik_d0 = layerA.point[idx].depth;
     this.quik_t0 = layerA.point[idx].time;
@@ -452,17 +532,16 @@ export class USection {
         "dimgray",
         layer.velocityLayer.color,
         false,
-        false //    true
+        true
       );
     });
 
     this.visibleLayers.forEach((layer) => {
-      // if (layer.isContact)
       this.plotSurface(
         context,
         this.xValues,
         layer.yValues,
-        layer.color, // "dimgray",
+        "dimgray",
         layer.velocityLayer.color,
         true,
         false

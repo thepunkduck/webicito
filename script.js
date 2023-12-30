@@ -2,6 +2,9 @@ import { Domain } from "./ZLoc.js";
 import { USection } from "./ZLoc.js";
 
 var LAYER_WIDTH = 400;
+var SMOOTH_WIN = 15;
+var TAPER_WIN = 1;
+var uSection;
 
 var mX = 0;
 var mY = 0;
@@ -11,18 +14,21 @@ var editingDomain = Domain.None;
 var pointerDomain = Domain.None;
 var editLayer;
 var prevIdx = -1;
+var edited_i0 = -1;
+var edited_i1 = -1;
 var prevY = -999;
-var uSection;
+var initialZ;
+var editZ;
 
 init();
 
 function init() {
   console.log("init!!!");
-  window.requestAnimationFrame(draw);
-  window.addEventListener("resize", resizeCanvas, false);
 
+  TAPER_WIN = Math.floor(SMOOTH_WIN / 2);
+  TAPER_WIN = SMOOTH_WIN;
   var gasDV = 300;
-  var oilDV = 0;
+  var oilDV = 100;
   uSection = new USection(LAYER_WIDTH);
   uSection.addLayer("Seawater", "lightblue", 1500, 0, false, 0.0);
   uSection.addLayer("Claystone", "pink", 2500, 0.02, false, 300.0);
@@ -47,19 +53,40 @@ function init() {
   canvas.addEventListener("mouseout", mouseOut);
   uSection.canvasTime = canvas;
 
-  //     .addEventListener("mousemove", function (event) {
-  //     myFunctionTIME(event);
-  // });
   canvas = document.getElementById("canvasDepth");
   canvas.addEventListener("mousedown", startEditDEPTH);
   canvas.addEventListener("mousemove", moveEditDEPTH);
   canvas.addEventListener("mouseup", endEdit);
   canvas.addEventListener("mouseout", mouseOut);
   uSection.canvasDepth = canvas;
-  // document.getElementById("canvasDepth")
-  //     .addEventListener("mousemove", function (event) {
-  //         myFunctionDEPTH(event);
-  //     });
+
+  document.addEventListener("DOMContentLoaded", function () {
+    addOutsideEventListener("canvasTime");
+    addOutsideEventListener("canvasDepth");
+  });
+
+  window.requestAnimationFrame(draw);
+  window.addEventListener("resize", resizeCanvas, false);
+}
+
+function addOutsideEventListener(canvasName) {
+  var canvas = document.getElementById(canvasName);
+  var isMouseDown = false;
+
+  canvas.addEventListener("mousedown", function (e) {
+    isMouseDown = true;
+
+    document.addEventListener("mouseup", function mouseUpHandler(e) {
+      isMouseDown = false;
+
+      // Your mouseup code here, even if it's outside the canvas
+      console.log("Mouse up outside canvas");
+      endEdit(e);
+      // Remove the mouseup event listener from the document
+      document.removeEventListener("mouseup", mouseUpHandler);
+      document.removeEventListener("mouseup", mouseUpHandler);
+    });
+  });
 }
 
 export function changedHydrocarbon() {
@@ -102,6 +129,7 @@ export function changedHydrocarbon() {
   uSection.setLayerVisible("OilB", oilB);
   uSection.setLayerVisible("GasA", gasA);
   uSection.setLayerVisible("GasB", gasB);
+  uSection.flattenContacts();
   uSection.update_TimeFromDepth();
 
   draw();
@@ -153,13 +181,22 @@ function startEdit(domain, e) {
   prevIdx = idx;
   prevY = mY;
 
+  edited_i0 = edited_i1 = idx;
+
   // rough convert if needed
-  if (editLayer.isContact && editingDomain == Domain.DomTime) {
-    uSection.setupQuickTimeToDepth(editLayer);
+  if (
+    editLayer != null &&
+    editLayer.isContact &&
+    editingDomain == Domain.DomTime
+  ) {
+    uSection.setupQuickTimeToDepth(editLayer, idx);
   }
 
-  if (editLayer != null) console.log("EDIT LAYER START:" + editLayer.name);
-  else console.log("EDIT LAYER START: NULL");
+  if (editLayer != null) {
+    console.log("EDIT LAYER START:" + editLayer.name);
+    initialZ = editLayer.snapShot(editingDomain);
+    editZ = editLayer.snapShot(editingDomain);
+  } else console.log("EDIT LAYER START: NULL");
 }
 
 function moveEdit(domain, e) {
@@ -180,8 +217,9 @@ function moveEdit(domain, e) {
           " between " +
           layerA.name +
           " and " +
-          layerB.name
+          (layerB != null ? layerB.name : "-")
       );
+
       let idx = uSection.getIndex(mX);
       if (idx != -1) {
         let ia = 0;
@@ -200,17 +238,25 @@ function moveEdit(domain, e) {
           yb = prevY;
         }
 
+        edited_i0 = Math.min(edited_i0, idx);
+        edited_i1 = Math.max(edited_i1, idx);
+
         if (editLayer.isContact) {
           if (editingDomain == Domain.DomDepth)
-            uSection.moveContact(editLayer, rZ, idx, true);
+            uSection.adjustContactDepth(editLayer, rZ, idx, true);
           else {
             // rough convert time to depth to
             var roughDepth = uSection.quickConvert(rZ);
-            uSection.moveContact(editLayer, roughDepth, idx, false);
+            uSection.adjustContactDepth(editLayer, roughDepth, idx, false);
             uSection.update_TimeFromDepth(editLayer);
-            // restrict editlayer in TIME
-
-            // times below unaffected
+            var vizBelow = uSection.getVisibleLayerBelow(editLayer);
+            // restrict editlayer in TIME. Times below unaffected
+            if (vizBelow != null)
+              for (let i = 0; i < uSection.length; i++)
+                editLayer.point[i].time = Math.min(
+                  editLayer.point[i].time,
+                  vizBelow.point[i].time
+                );
           }
         } else {
           // regular
@@ -222,21 +268,45 @@ function moveEdit(domain, e) {
               var z = uSection.pointerTo(editingDomain, y);
               if (z < minZ) z = minZ;
               if (z > maxZ) z = maxZ;
-              editLayer.point[i].time = z;
+              editZ[i] = z;
             } else {
               var minZ = layerA.point[i].depth;
               var maxZ = layerB != null ? layerB.point[i].depth : 9999999999;
               var z = uSection.pointerTo(editingDomain, y);
               if (z < minZ) z = minZ;
               if (z > maxZ) z = maxZ;
-              editLayer.point[i].depth = z;
+              editZ[i] = z;
             }
           }
+
+          // smoothed version of editZ
+          // -> push edit range (taper?) to editLayer
+          editLayer.overwrite(editingDomain, initialZ);
+
+          // extend edges horizontally
+          var n = LAYER_WIDTH;
+          const tmp = editLayer.snapShot(editingDomain);
+          for (let i = 0; i < n; i++) {
+            if (i < edited_i0) tmp[i] = editZ[edited_i0];
+            else if (i > edited_i1) tmp[i] = editZ[edited_i1];
+            else tmp[i] = editZ[i];
+          }
+
+          var smoothZ = smooth(tmp, SMOOTH_WIN);
+
+          editLayer.overwriteRange(
+            editingDomain,
+            smoothZ,
+            0, //    edited_i0,
+            LAYER_WIDTH - 1, //    edited_i1,
+            TAPER_WIN
+          );
         }
 
         prevIdx = idx;
         prevY = mY;
       }
+
       if (editingDomain == Domain.DomTime) {
         uSection.update_DepthFromTime(null);
         uSection.flattenContacts();
@@ -254,10 +324,29 @@ function endEdit(e) {
   editLayer = null;
   prevIdx = -1;
   prevY = -999;
+  edited_i0 = -1;
+  edited_i1 = -1;
   console.log("EDIT LAYER END:");
 }
 
 function showOut() {
   var coor = pointerDomain + " (" + Math.round(mX) + "," + Math.round(rZ) + ")";
   document.getElementById("demo").innerHTML = coor;
+}
+
+function smooth(zArray, win) {
+  const n = zArray.length;
+  const smoothed = new Array(n).fill(0.0);
+
+  const hwin = Math.floor(win / 2);
+  for (let j = 0; j < win; j++) {
+    var offset = j - hwin;
+    for (let i = 0; i < n; i++) {
+      var ia = i + offset;
+      if (ia < 0) ia = 0;
+      if (ia >= n) ia = n - 1;
+      smoothed[i] += zArray[ia] / win;
+    }
+  }
+  return smoothed;
 }
