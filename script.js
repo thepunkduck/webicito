@@ -51,6 +51,7 @@ function init() {
   canvas.addEventListener("mousemove", moveEditTIME);
   canvas.addEventListener("mouseup", endEdit);
   canvas.addEventListener("mouseout", mouseOut);
+  canvas.addEventListener("touchmove", moveEditTIME);
   uSection.canvasTime = canvas;
 
   canvas = document.getElementById("canvasDepth");
@@ -58,6 +59,7 @@ function init() {
   canvas.addEventListener("mousemove", moveEditDEPTH);
   canvas.addEventListener("mouseup", endEdit);
   canvas.addEventListener("mouseout", mouseOut);
+  canvas.addEventListener("touchmove", moveEditTIME);
   uSection.canvasDepth = canvas;
 
   document.addEventListener("DOMContentLoaded", function () {

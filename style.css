@@ -1,5 +1,5 @@
 body {
-  background-color: rgb(62, 107, 206);
+  background-color: rgb(255, 255, 255);
   font-family: "Exo", sans-serif;
 
   overflow: hidden; /* Prevent scrolling */
@@ -18,7 +18,7 @@ canvas {
 
 h1,
 h2 {
-  color: #3b5d9e; /* Red color (replace with your desired color code) */
+  color: #277a66; /* Red color (replace with your desired color code) */
 }
 
 /* Define color for h3 */
