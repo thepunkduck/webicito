@@ -200,6 +200,8 @@ function startEdit(domain, e) {
 }
 
 function moveEdit(domain, e) {
+  console.log("moveEdit : " + e.x + " , " + e.y);
+
   let coord = uSection.handleXY(domain, e);
   mX = coord.x;
   mY = coord.y;
