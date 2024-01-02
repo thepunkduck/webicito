@@ -11,8 +11,10 @@ export const Domain = {
   DomTime: "Time",
   DomDepth: "Depth",
   None: "None",
-  Any: "Any",
 };
+
+const LEFT_SPACE = 80;
+const CANVAS_H = 400;
 
 const MINKT = 0.0001;
 const _ms2S = 0.001;
@@ -28,6 +30,19 @@ function TimeToDepth(dA, tA, tB, v0, k, tml) {
   return dA + DeltaDepth(tA, tB, v0, k, tml);
 }
 
+function VelocityAtTime(tB, v0, k, tml) {
+  if (tB < 0) {
+    return 343; // air
+  }
+  if (tB < tml) {
+    // in water
+    return 1500;
+  }
+
+  var tbml = tB - tml;
+  return v0 + 2 * k * tbml;
+}
+
 function DepthToTime(tA, dA, dB, v0, k, tml) {
   if (Math.abs(k) > MINKT) {
     dA *= _m2Mm;
@@ -36,7 +51,6 @@ function DepthToTime(tA, dA, dB, v0, k, tml) {
     var num2 = k * (2.0 * tml * tA - tA * tA) - v0 * tA + 2.0 * (dA - dB);
     return (0.0 - num + Math.sqrt(num * num - 4.0 * k * num2)) / (2.0 * k);
   }
-
   return tA + (2.0 * _s2Ms * (dB - dA)) / v0;
 }
 
@@ -59,49 +73,41 @@ export class Layer {
     this.taper = new Array(1).fill(0.0);
   }
 
+  setZ(domain, i, value) {
+    if (domain == Domain.DomTime) {
+      this.point[i].time = value;
+    } else {
+      this.point[i].depth = value;
+    }
+  }
+
+  getZ(domain, i) {
+    return domain == Domain.DomTime ? this.point[i].time : this.point[i].depth;
+  }
+
   convertToScreenY(domain, height, minZ, maxZ) {
     let res = initializeFloatArray(this.length);
-    var dZ = maxZ - minZ;
-
-    if (domain == Domain.DomTime) {
-      for (let i = 0; i < this.length; i++) {
-        var z = this.point[i].time;
-        var y = height * ((z - minZ) / dZ);
-        this.point[i].screenTime = y;
-        res[i] = y;
-      }
-    } else {
-      for (let i = 0; i < this.length; i++) {
-        var z = this.point[i].depth;
-        var y = height * ((z - minZ) / dZ);
-        this.point[i].screenDepth = y;
-        res[i] = y;
-      }
+    for (let i = 0; i < this.length; i++) {
+      var z = this.getZ(domain, i);
+      var y = toScreenY(z, height, minZ, maxZ);
+      if (domain == Domain.DomTime) this.point[i].screenTime = y;
+      else this.point[i].screenDepth = y;
+      res[i] = y;
     }
 
     return res;
   }
 
   setToConstant(domain, value) {
-    if (domain == Domain.DomDepth) {
-      for (let i = 0; i < this.length; i++) {
-        this.point[i].depth = value;
-      }
-    } else {
-      for (let i = 0; i < this.length; i++) {
-        this.point[i].time = value;
-      }
+    for (let i = 0; i < this.length; i++) {
+      this.setZ(domain, i, value);
     }
   }
 
   snapShot(domain) {
     const n = this.length;
     const z = new Array(n).fill(0.0);
-    if (domain == Domain.DomDepth) {
-      for (let i = 0; i < n; i++) z[i] = this.point[i].depth;
-    } else {
-      for (let i = 0; i < n; i++) z[i] = this.point[i].time;
-    }
+    for (let i = 0; i < n; i++) z[i] = this.getZ(domain, i);
     return z;
   }
 
@@ -124,48 +130,24 @@ export class Layer {
   overwriteRange(domain, inputZ, i0, i1, taperW) {
     if (this.taper.length != taperW) this.taper = this.calcTaper(taperW);
 
-    if (domain == Domain.DomDepth) {
-      for (let i = i0; i <= i1; i++) this.point[i].depth = inputZ[i];
+    // values in edit range
+    for (let i = i0; i <= i1; i++) this.setZ(domain, i, inputZ[i]);
 
-      // tapering
+    // tapering
+    for (let i = 1; i < taperW; i++) {
+      var f = this.taper[i];
+      var ia = i1 + i;
+      if (ia < this.length)
+        this.setZ(domain, ia, f * this.getZ(domain, ia) + (1 - f) * inputZ[ia]);
 
-      for (let i = 1; i < taperW; i++) {
-        var f = this.taper[i];
-        console.log(f);
-        var ia = i1 + i;
-        if (ia < this.length) {
-          this.point[ia].depth =
-            f * this.point[ia].depth + (1 - f) * inputZ[ia];
-        }
-        ia = i0 - i;
-        if (ia >= 0) {
-          this.point[ia].depth =
-            f * this.point[ia].depth + (1 - f) * inputZ[ia];
-        }
-      }
-    } else {
-      for (let i = i0; i <= i1; i++) this.point[i].time = inputZ[i];
-      for (let i = 1; i < taperW; i++) {
-        var f = this.taper[i];
-
-        var ia = i1 + i;
-        if (ia < this.length) {
-          this.point[ia].time = f * this.point[ia].time + (1 - f) * inputZ[ia];
-        }
-        ia = i0 - i;
-        if (ia >= 0) {
-          this.point[ia].time = f * this.point[ia].time + (1 - f) * inputZ[ia];
-        }
-      }
+      ia = i0 - i;
+      if (ia >= 0)
+        this.setZ(domain, ia, f * this.getZ(domain, ia) + (1 - f) * inputZ[ia]);
     }
   }
 
   overwrite(domain, inputZ) {
-    if (domain == Domain.DomDepth) {
-      for (let i = 0; i < this.length; i++) this.point[i].depth = inputZ[i];
-    } else {
-      for (let i = 0; i < this.length; i++) this.point[i].time = inputZ[i];
-    }
+    for (let i = 0; i < this.length; i++) this.setZ(domain, i, inputZ[i]);
   }
 }
 
@@ -181,14 +163,16 @@ export class USection {
     this.canvasTime = null;
     this.length = length;
 
-    this.x0 = 100;
+    this.x0 = LEFT_SPACE;
     this.y0 = 0;
 
-    this.quik_d0 = 0;
-    this.quik_t0 = 0;
-    this.quik_tml = 0;
-    this.quik_v0 = 0;
-    this.quik_k = 0;
+    this.quik_layer = null;
+
+    this.pointerIndex = -1;
+    this.pointerDepth = NaN;
+    this.pointerTime = NaN;
+    this.pointerVelocity = NaN;
+    this.pointerDomain = Domain.None;
   }
 
   addLayer(name, color, v0, k, isContact, initDepth) {
@@ -356,9 +340,19 @@ export class USection {
     else this.update_DepthFromTime(null);
   }
 
+  debug(title) {
+    console.log(title);
+    for (let j = 0; j < this.visibleLayers.length; j++) {
+      let layer = this.visibleLayers[j];
+
+      console.log(
+        layer.name + " " + layer.point[0].time + ", " + layer.point[0].depth
+      );
+    }
+  }
+
   update_TimeFromDepth(finalLayer) {
     this.setupVelocityLayers();
-
     // ensure contacts increasing
     for (let i = 1; i < this.visibleContactLayers.length; i++) {
       var cntA = this.visibleContactLayers[i - 1];
@@ -369,16 +363,20 @@ export class USection {
 
     // water at zero always
     let waterLayer = this.layers[0];
-    waterLayer.setToConstant(Domain.DomDepth, 0);
-    waterLayer.setToConstant(Domain.DomTime, 0);
+    let mudlineLayer = this.layers[1];
 
+    for (let i = 0; i < this.length; i++) {
+      waterLayer.point[i].depth = Math.min(mudlineLayer.point[i].depth, 0.0);
+    }
+    waterLayer.setToConstant(Domain.DomTime, 0);
     // top layer with simple water velocity
     let v0 = waterLayer.v0;
-    let mudlineLayer = this.layers[1];
     for (let i = 0; i < this.length; i++) {
-      mudlineLayer.point[i].time = (mudlineLayer.point[i].depth * 2000) / v0;
+      if (mudlineLayer.point[i].depth > 0)
+        // mudline: seawater velocity
+        mudlineLayer.point[i].time = (mudlineLayer.point[i].depth * 2000) / v0;
+      else mudlineLayer.point[i].time = 0.0; // it's at surface, elevated
     }
-
     // the rest..
     for (let j = 2; j < this.visibleLayers.length; j++) {
       let layerA = this.visibleLayers[j - 1];
@@ -460,47 +458,127 @@ export class USection {
     }
   }
 
-  setupQuickTimeToDepth(layer, idx) {
-    var layerA = this.getVisibleLayerAbove(layer);
-
-    // var idx = layerA.point.reduce(
-    //   (minIndex, currentElement, currentIndex, array) => {
-    //     if (currentElement.t < array[minIndex].time) {
-    //       return currentIndex;
-    //     } else {
-    //       return minIndex;
-    //     }
-    //   },
-    //   0
-    // );
-
-    this.quik_d0 = layerA.point[idx].depth;
-    this.quik_t0 = layerA.point[idx].time;
-    this.quik_tml = this.layers[1].point[idx].time;
-    this.quik_v0 = layerA.velocityLayer.v0;
-    this.quik_k = layerA.velocityLayer.k;
+  setupQuickTimeToDepth(layer) {
+    this.quik_layer = this.getVisibleLayerAbove(layer);
   }
 
-  quickConvert(t1) {
+  quickConvert(t1, idx) {
     var d1 = TimeToDepth(
-      this.quik_d0,
-      this.quik_t0,
+      this.quik_layer.point[idx].depth,
+      this.quik_layer.point[idx].time,
       t1,
-      this.quik_v0,
-      this.quik_k,
-      this.quik_tml
+      this.quik_layer.velocityLayer.v0,
+      this.quik_layer.velocityLayer.k,
+      this.layers[1].point[idx].time
     );
     return d1;
+  }
+
+  convertDepthToTime(depth, idx) {
+    // get the layer pointer is in
+    if (idx < 0) return NaN;
+    if (idx >= this.length) return NaN;
+    var vizLayers = this.visibleLayers;
+    let mudlineLayer = this.layers[1];
+    for (let i = vizLayers.length - 1; i >= 0; i--) {
+      var layerA = vizLayers[i];
+      if (depth >= layerA.point[idx].depth) {
+        // therefore tA, dA above pointer
+        var tA = layerA.point[idx].time;
+        var dA = layerA.point[idx].depth;
+        let ptML = mudlineLayer.point[idx];
+        // therefore time
+        var time = DepthToTime(
+          tA,
+          dA,
+          depth,
+          layerA.velocityLayer.v0,
+          layerA.velocityLayer.k,
+          ptML.time
+        );
+        return time;
+      }
+    }
+
+    return NaN;
+  }
+
+  convertTimeToDepth(time, idx) {
+    // get the layer pointer is in
+    if (idx < 0) return NaN;
+    if (idx >= this.length) return NaN;
+    var vizLayers = this.visibleLayers;
+    let mudlineLayer = this.layers[1];
+    for (let i = vizLayers.length - 1; i >= 0; i--) {
+      var layerA = vizLayers[i];
+      if (time >= layerA.point[idx].time) {
+        // therefore tA, dA above pointer
+        var tA = layerA.point[idx].time;
+        var dA = layerA.point[idx].depth;
+        let ptML = mudlineLayer.point[idx];
+        // therefore depth
+        var depth = TimeToDepth(
+          dA,
+          tA,
+          time,
+          layerA.velocityLayer.v0,
+          layerA.velocityLayer.k,
+          ptML.time
+        );
+        return depth;
+      }
+    }
+
+    return NaN;
+  }
+
+  getVelocityAtTime(time, idx) {
+    // get the layer pointer is in
+    if (idx < 0) return NaN;
+    if (idx >= this.length) return NaN;
+    var vizLayers = this.visibleLayers;
+    let mudlineLayer = this.layers[1];
+
+    for (let i = vizLayers.length - 1; i >= 0; i--) {
+      var layerA = vizLayers[i];
+      if (time >= layerA.point[idx].time) {
+        let ptML = mudlineLayer.point[idx];
+        // therefore velocity
+        return VelocityAtTime(
+          time,
+          layerA.velocityLayer.v0,
+          layerA.velocityLayer.k,
+          ptML.time
+        );
+      }
+    }
+
+    return NaN;
+  }
+
+  setCursor(t, d, v, i) {
+    if (i < 0) i = -1;
+    if (i >= this.length) i = -1;
+
+    if (i != -1) {
+      this.pointerTime = t;
+      this.pointerDepth = d;
+      this.pointerIndex = i;
+      this.pointerVelocity = v;
+    } else {
+      this.pointerTime = NaN;
+      this.pointerDepth = NaN;
+      this.pointerIndex = i;
+      this.pointerVelocity = NaN;
+    }
   }
 
   drawSection(domain, name) {
     var canvas = document.getElementById(name);
     var context = canvas.getContext("2d");
-    var bdrX = 10;
-    var h = 300;
-    canvas.width = window.innerWidth - bdrX;
-    canvas.height = h;
-    context.clearRect(0, 0, window.innerWidth, h);
+    canvas.height = CANVAS_H;
+    canvas.width = window.innerWidth;
+    context.clearRect(0, 0, window.innerWidth, CANVAS_H);
     context.save();
 
     var w = canvas.width - this.x0;
@@ -518,7 +596,7 @@ export class USection {
 
     // draw, fill layers
     for (let i = 0; i < this.length; i++) {
-      let x = this.x0 + (w * i) / (this.length - 1);
+      let x = this.toScreenX(i, w);
       this.xValues[i] = x;
     }
 
@@ -547,6 +625,27 @@ export class USection {
         false
       );
     });
+
+    // cursor
+    if (this.pointerIndex != -1 && this.pointerDomain != domain) {
+      if (domain == Domain.DomTime) {
+        var sy = toScreenY(this.pointerTime, h, minZ, maxZ);
+        var sx = this.toScreenX(this.pointerIndex, w);
+      } else {
+        var sy = toScreenY(this.pointerDepth, h, minZ, maxZ);
+        var sx = this.toScreenX(this.pointerIndex, w);
+      }
+
+      context.beginPath();
+      context.strokeStyle = "rgba(255,0,0, 1)";
+      context.lineWidth = 1;
+      context.moveTo(sx + 10, sy);
+      context.lineTo(sx - 10, sy);
+      context.stroke();
+      context.moveTo(sx, sy - 10);
+      context.lineTo(sx, sy + 10);
+      context.stroke();
+    }
 
     // labels
     context.font = "12px exo";
@@ -581,7 +680,13 @@ export class USection {
   handleXY(domain, e) {
     let canvas = domain == Domain.DomTime ? this.canvasTime : this.canvasDepth;
     const rect = canvas.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    var scaleX = canvas.width / rect.width;
+    var scaleY = canvas.height / rect.height;
+
+    var mouseX = (e.clientX - rect.left) * scaleX;
+    var mouseY = (e.clientY - rect.top) * scaleY;
+
+    return { x: mouseX, y: mouseY };
   }
 
   plotSurface(ctx, xValues, yValues, style, fillColor, showLine, showFill) {
@@ -623,7 +728,6 @@ export class USection {
   getLayerAtPointer(domain, x, y) {
     let idx = this.getIndex(x);
     if (idx == -1) return null;
-
     let minDiff = 99999999;
     let closeLayer = null;
     let i = -1;
@@ -655,6 +759,8 @@ export class USection {
   }
 
   getIndex(x) {
+    if (x < this.xValues[0] - 2) return -1;
+    if (x > this.xValues[this.xValues.length - 1] + 2) return -1;
     return findClosestIndex(this.xValues, x);
   }
 
@@ -674,6 +780,14 @@ export class USection {
     let h = this.canvasDepth.height;
     return (dZ * y) / h + this.minDepth;
   }
+
+  toScreenX(i, width) {
+    return this.x0 + (width * i) / (this.length - 1);
+  }
+
+  toX(sx, width) {
+    return Math.round(((sx - this.x0) * (this.length - 1)) / width);
+  }
 }
 
 function initializeFloatArray(n) {
@@ -692,7 +806,6 @@ function findClosestIndex(array, targetValue) {
       closestIndex = i;
     }
   }
-
   return closestIndex;
 }
 
@@ -700,4 +813,8 @@ function clamp(v, minv, maxv) {
   if (v < minv) return minv;
   if (v > maxv) return maxv;
   return v;
+}
+
+function toScreenY(z, height, minZ, maxZ) {
+  return height * ((z - minZ) / (maxZ - minZ));
 }

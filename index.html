@@ -8,17 +8,20 @@
     <style>
         .form-group {
             margin-bottom: 15px;
-        }
-
-        .form-group label {
             display: inline-block;
-            width: 100px;
-            /* Adjust the width based on your design */
+            margin-right: 20px;
+            margin-left: 80px;
+            /* Optional: Add some space between the groups */
         }
 
-        .form-group select {
-            width: 150px;
-            /* Adjust the width based on your design */
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        select {
+            width: 200px;
+            padding: 5px;
         }
     </style>
 
@@ -38,27 +41,34 @@
 
 
     <h3>TIME</h3>
-    <canvas id="canvasTime" width=auto height="100"></canvas>
+    <canvas id="canvasTime"></canvas>
+    <div id="rightSpace"></div>
 
     <h3>DEPTH</h3>
-    <canvas id="canvasDepth" width=auto height="100"></canvas>
+    <canvas id="canvasDepth"></canvas>
+    <div id="rightSpace"></div>
 
-    <label for="hcSelectorA">Hydrocarbons A:</label>
-    <select id="hcSelectorA">
-        <option value="none">None</option>
-        <option value="oil">Oil</option>
-        <option value="gas">Gas</option>
-        <option value="oil_gas">Oil & Gas</option>
-    </select>
-    <p> </p>
-    <label for="hcSelectorB">Hydrocarbons B:</label>
-    <select id="hcSelectorB">
-        <option value="none">None</option>
-        <option value="oil">Oil</option>
-        <option value="gas">Gas</option>
-        <option value="oil_gas">Oil & Gas</option>
-    </select>
+    <div class="form-group">
+        <label for="hcSelectorA">Hydrocarbons A:</label>
+        <select id="hcSelectorA">
+            <option value="none">None</option>
+            <option value="oil">Oil</option>
+            <option value="gas">Gas</option>
+            <option value="oil_gas">Oil & Gas</option>
+        </select>
+    </div>
 
+
+
+    <div class="form-group">
+        <label for="hcSelectorB">Hydrocarbons B:</label>
+        <select id="hcSelectorB">
+            <option value="none">None</option>
+            <option value="oil">Oil</option>
+            <option value="gas">Gas</option>
+            <option value="oil_gas">Oil & Gas</option>
+        </select>
+    </div>
     <script type="module">
 
         import { changedHydrocarbon } from './script.js';

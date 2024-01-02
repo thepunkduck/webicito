@@ -1,8 +1,8 @@
 import { Domain } from "./ZLoc.js";
 import { USection } from "./ZLoc.js";
 
-var LAYER_WIDTH = 400;
-var SMOOTH_WIN = 15;
+var LAYER_WIDTH = 200;
+var SMOOTH_WIN = 5;
 var TAPER_WIN = 1;
 var uSection;
 
@@ -11,7 +11,7 @@ var mY = 0;
 var rZ = 0;
 var frame = 0;
 var editingDomain = Domain.None;
-var pointerDomain = Domain.None;
+
 var editLayer;
 var prevIdx = -1;
 var edited_i0 = -1;
@@ -27,24 +27,24 @@ function init() {
 
   TAPER_WIN = Math.floor(SMOOTH_WIN / 2);
   TAPER_WIN = SMOOTH_WIN;
-  var gasDV = 300;
-  var oilDV = 100;
+  var gasDV = 500;
+  var oilDV = 240;
   uSection = new USection(LAYER_WIDTH);
   uSection.addLayer("Seawater", "lightblue", 1500, 0, false, 0.0);
-  uSection.addLayer("Claystone", "pink", 2500, 0.02, false, 300.0);
-  uSection.addLayer("SandstoneA", "yellow", 1500, 0.01, false, 1000.0);
+  uSection.addLayer("Claystone", "pink", 1600, 0.41, false, 300.0);
+  uSection.addLayer("SandstoneA", "yellow", 2000, 0.515, false, 1000.0);
   uSection.addLayer("GasA", "darkred", 1500 - gasDV, 0.01, true, 1100.0);
   uSection.addLayer("OilA", "darkgreen", 1500 - oilDV, 0.01, true, 1200.0);
   uSection.addLayer("Salt", "deepskyblue", 4500, 0.0, false, 1700.0);
-  uSection.addLayer("SandstoneB", "yellow", 1500, 0.01, false, 2500.0);
+  uSection.addLayer("SandstoneB", "yellow", 2000, 0.515, false, 2500.0);
   uSection.addLayer("GasB", "darkred", 1500 - gasDV, 0.01, true, 2600.0);
   uSection.addLayer("OilB", "darkgreen", 1500 - oilDV, 0.01, true, 2700.0);
-  uSection.addLayer("Basement", "purple", 3500, 0.01, false, 3500.0);
+  uSection.addLayer("Basement", "purple", 4500, 1.1, false, 3500.0);
 
   uSection.setVerticalRange(Domain.DomDepth, -200.0, 5000.0);
   uSection.setVerticalRange(Domain.DomTime, -200.0, 4000.0);
   changedHydrocarbon();
-  uSection.update_TimeFromDepth();
+  uSection.update_TimeFromDepth(null);
 
   let canvas = document.getElementById("canvasTime");
   canvas.addEventListener("mousedown", startEditTIME);
@@ -71,14 +71,9 @@ function init() {
 
 function addOutsideEventListener(canvasName) {
   var canvas = document.getElementById(canvasName);
-  var isMouseDown = false;
 
   canvas.addEventListener("mousedown", function (e) {
-    isMouseDown = true;
-
     document.addEventListener("mouseup", function mouseUpHandler(e) {
-      isMouseDown = false;
-
       // Your mouseup code here, even if it's outside the canvas
       console.log("Mouse up outside canvas");
       endEdit(e);
@@ -130,8 +125,7 @@ export function changedHydrocarbon() {
   uSection.setLayerVisible("GasA", gasA);
   uSection.setLayerVisible("GasB", gasB);
   uSection.flattenContacts();
-  uSection.update_TimeFromDepth();
-
+  uSection.update_TimeFromDepth(null);
   draw();
 }
 
@@ -166,7 +160,8 @@ function moveEditDEPTH(e) {
 }
 
 function mouseOut(e) {
-  pointerDomain = Domain.None;
+  uSection.pointerDomain = Domain.None;
+  uSection.setCursor(NaN, NaN, -1);
   showOut();
 }
 
@@ -178,6 +173,9 @@ function startEdit(domain, e) {
   editingDomain = domain;
   editLayer = uSection.getLayerAtPointer(editingDomain, mX, mY);
   let idx = uSection.getIndex(mX);
+
+  if (idx < 0) return;
+
   prevIdx = idx;
   prevY = mY;
 
@@ -189,7 +187,7 @@ function startEdit(domain, e) {
     editLayer.isContact &&
     editingDomain == Domain.DomTime
   ) {
-    uSection.setupQuickTimeToDepth(editLayer, idx);
+    uSection.setupQuickTimeToDepth(editLayer);
   }
 
   if (editLayer != null) {
@@ -204,23 +202,27 @@ function moveEdit(domain, e) {
   mX = coord.x;
   mY = coord.y;
   rZ = uSection.pointerTo(domain, mY);
+  let idx = uSection.getIndex(mX);
 
-  pointerDomain = domain;
+  if (domain == Domain.DomTime) {
+    uSection.setCursor(
+      rZ,
+      uSection.convertTimeToDepth(rZ, idx),
+      uSection.getVelocityAtTime(rZ, idx),
+      idx
+    );
+  } else {
+    var pT = uSection.convertDepthToTime(rZ, idx);
+    uSection.setCursor(pT, rZ, uSection.getVelocityAtTime(pT, idx), idx);
+  }
+
+  uSection.pointerDomain = domain;
 
   if (editingDomain == domain) {
     if (editLayer != null) {
       var layerA = uSection.getVisibleRegularLayerAbove(editLayer);
       var layerB = uSection.getVisibleRegularLayerBelow(editLayer);
-      console.log(
-        "Edit:" +
-          editLayer.name +
-          " between " +
-          layerA.name +
-          " and " +
-          (layerB != null ? layerB.name : "-")
-      );
 
-      let idx = uSection.getIndex(mX);
       if (idx != -1) {
         let ia = 0;
         let ib = 0;
@@ -237,16 +239,27 @@ function moveEdit(domain, e) {
           ya = mY;
           yb = prevY;
         }
-
         edited_i0 = Math.min(edited_i0, idx);
         edited_i1 = Math.max(edited_i1, idx);
+
+        console.log(
+          "Edit:" +
+            editLayer.name +
+            " between " +
+            layerA.name +
+            " and " +
+            (layerB != null ? layerB.name : "-") +
+            ia +
+            ", ",
+          ib + ", " + edited_i0 + ", " + edited_i1
+        );
 
         if (editLayer.isContact) {
           if (editingDomain == Domain.DomDepth)
             uSection.adjustContactDepth(editLayer, rZ, idx, true);
           else {
             // rough convert time to depth to
-            var roughDepth = uSection.quickConvert(rZ);
+            var roughDepth = uSection.quickConvert(rZ, idx);
             uSection.adjustContactDepth(editLayer, roughDepth, idx, false);
             uSection.update_TimeFromDepth(editLayer);
             var vizBelow = uSection.getVisibleLayerBelow(editLayer);
@@ -262,6 +275,7 @@ function moveEdit(domain, e) {
           // regular
           for (let i = ia; i <= ib; i++) {
             let y = ib == ia ? mY : ((yb - ya) * (i - ia)) / (ib - ia) + ya;
+
             if (editingDomain == Domain.DomTime) {
               var minZ = layerA.point[i].time;
               var maxZ = layerB != null ? layerB.point[i].time : 9999999999;
@@ -270,7 +284,10 @@ function moveEdit(domain, e) {
               if (z > maxZ) z = maxZ;
               editZ[i] = z;
             } else {
-              var minZ = layerA.point[i].depth;
+              // depth edit is a little different!
+              var minZ =
+                layerA.name == "Seawater" ? -99999 : layerA.point[i].depth;
+
               var maxZ = layerB != null ? layerB.point[i].depth : 9999999999;
               var z = uSection.pointerTo(editingDomain, y);
               if (z < minZ) z = minZ;
@@ -285,20 +302,19 @@ function moveEdit(domain, e) {
 
           // extend edges horizontally
           var n = LAYER_WIDTH;
-          const tmp = editLayer.snapShot(editingDomain);
+          const tmp = new Array(n).fill(0.0);
           for (let i = 0; i < n; i++) {
             if (i < edited_i0) tmp[i] = editZ[edited_i0];
             else if (i > edited_i1) tmp[i] = editZ[edited_i1];
             else tmp[i] = editZ[i];
           }
-
           var smoothZ = smooth(tmp, SMOOTH_WIN);
-
+          //var smoothZ = tmp;
           editLayer.overwriteRange(
             editingDomain,
             smoothZ,
-            0, //    edited_i0,
-            LAYER_WIDTH - 1, //    edited_i1,
+            edited_i0,
+            edited_i1,
             TAPER_WIN
           );
         }
@@ -330,7 +346,22 @@ function endEdit(e) {
 }
 
 function showOut() {
-  var coor = pointerDomain + " (" + Math.round(mX) + "," + Math.round(rZ) + ")";
+  var coor =
+    uSection.pointerDomain == Domain.None
+      ? ""
+      : "Time: " +
+        (isNaN(uSection.pointerTime)
+          ? "******"
+          : Math.round(uSection.pointerTime) + "ms") +
+        "    Depth: " +
+        (isNaN(uSection.pointerDepth)
+          ? "*****"
+          : Math.round(uSection.pointerDepth) + "m ") +
+        "    Velocity: " +
+        (isNaN(uSection.pointerVelocity)
+          ? "*****"
+          : Math.round(uSection.pointerVelocity) + "m/s ");
+
   document.getElementById("demo").innerHTML = coor;
 }
 

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas Example</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            background-color: #f0f0f0;
+            margin-left: 100px;
+            margin-right: 200px;
+            width: calc(100% - 300px);
+            /* Calculate the width to fill available space */
+
+        }
+    </style>
+</head>
+
+<body>
+
+    <canvas id="myCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('myCanvas');
+        const context = canvas.getContext('2d');
+
+        // Example: Drawing a rectangle on the canvas
+        context.fillStyle = '#3498db';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+    </script>
+
+</body>
+
+</html>
