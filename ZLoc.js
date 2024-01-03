@@ -13,6 +13,8 @@ export const Domain = {
   None: "None",
 };
 
+export const SEAWATER = "Sea Water";
+
 const LEFT_SPACE = 80;
 const CANVAS_H = 400;
 
@@ -65,12 +67,11 @@ export class Layer {
     this.color = color;
     this.active = false;
     this.visible = true;
+    this.isRestricted = false;
     this.length = length;
     this.point = Array.from({ length }, (_) => new ZLoc(initDepth, initDepth));
     this.index = -1;
     this.velocityLayer = this;
-
-    this.taper = new Array(1).fill(0.0);
   }
 
   setZ(domain, i, value) {
@@ -78,6 +79,18 @@ export class Layer {
       this.point[i].time = value;
     } else {
       this.point[i].depth = value;
+    }
+  }
+
+  setZ(domain, i, value, layerA, layerB) {
+    if (domain == Domain.DomTime) {
+      var minZ = layerA != null ? layerA.point[i].time : -Number.MAX_VALUE;
+      var maxZ = layerB != null ? layerB.point[i].time : Number.MAX_VALUE;
+      this.point[i].time = clamp(value, minZ, maxZ);
+    } else {
+      var minZ = layerA != null ? layerA.point[i].depth : -Number.MAX_VALUE;
+      var maxZ = layerB != null ? layerB.point[i].depth : Number.MAX_VALUE;
+      this.point[i].depth = clamp(value, minZ, maxZ);
     }
   }
 
@@ -111,43 +124,41 @@ export class Layer {
     return z;
   }
 
-  calcTaper(taperW) {
-    const fs = new Array(taperW).fill(0.0);
-    const k = 8;
-    const A0 = 1 / (1 + Math.exp(-k * (0 - 0.5)));
-    const A1 = 1 / (1 + Math.exp(-k * (1 - 0.5)));
-    const B0 = A1 - A0;
-    for (let i = 0; i < taperW; i++) {
-      var t = i / (taperW - 1);
-      var A = 1 / (1 + Math.exp(-k * (t - 0.5)));
-      var B = A1 - A;
-      var C = 1 - B / B0;
-      fs[i] = C;
-    }
-    return fs;
+  isAnyDeeperThan(layerA) {
+    for (let i = 0; i < this.length; i++)
+      if (this.point[i].depth > layerA.point[i].depth) return true;
+    return false;
   }
 
-  overwriteRange(domain, inputZ, i0, i1, taperW) {
-    if (this.taper.length != taperW) this.taper = this.calcTaper(taperW);
-
-    // values in edit range
-    for (let i = i0; i <= i1; i++) this.setZ(domain, i, inputZ[i]);
-
-    // tapering
-    for (let i = 1; i < taperW; i++) {
-      var f = this.taper[i];
-      var ia = i1 + i;
-      if (ia < this.length)
-        this.setZ(domain, ia, f * this.getZ(domain, ia) + (1 - f) * inputZ[ia]);
-
-      ia = i0 - i;
-      if (ia >= 0)
-        this.setZ(domain, ia, f * this.getZ(domain, ia) + (1 - f) * inputZ[ia]);
-    }
+  maximumThicknessBetween(layerA) {
+    var maxThickness = 0;
+    for (let i = 0; i < this.length; i++)
+      maxThickness = Math.max(
+        maxThickness,
+        Math.abs(this.point[i].depth - layerA.point[i].depth)
+      );
+    return maxThickness;
   }
 
-  overwrite(domain, inputZ) {
-    for (let i = 0; i < this.length; i++) this.setZ(domain, i, inputZ[i]);
+  get minDepth() {
+    var v = Number.MAX_VALUE;
+    for (let i = 0; i < this.length; i++) v = Math.min(this.point[i].depth, v);
+    return v;
+  }
+  get maxDepth() {
+    var v = -Number.MAX_VALUE;
+    for (let i = 0; i < this.length; i++) v = Math.max(this.point[i].depth, v);
+    return v;
+  }
+  get minTime() {
+    var v = Number.MAX_VALUE;
+    for (let i = 0; i < this.length; i++) v = Math.min(this.point[i].time, v);
+    return v;
+  }
+  get maxTime() {
+    var v = -Number.MAX_VALUE;
+    for (let i = 0; i < this.length; i++) v = Math.max(this.point[i].time, v);
+    return v;
   }
 }
 
@@ -173,6 +184,8 @@ export class USection {
     this.pointerTime = NaN;
     this.pointerVelocity = NaN;
     this.pointerDomain = Domain.None;
+
+    this.taper = new Array(1).fill(0.0);
   }
 
   addLayer(name, color, v0, k, isContact, initDepth) {
@@ -189,6 +202,70 @@ export class USection {
     this.layers.push(newLayer);
   }
 
+  overwriteLayer(layer, domain, inputZ) {
+    let layerA = this.getVisibleLayerAbove(layer);
+    let layerB = this.getVisibleLayerBelow(layer);
+    if (layer == this.mudlineLayer && domain == Domain.DomDepth) {
+      for (let i = 0; i < layer.length; i++)
+        layer.setZ(domain, i, inputZ[i], null, layerB);
+    } else if (layer == this.waterLayer) {
+      for (let i = 0; i < layer.length; i++)
+        layer.setZ(domain, i, inputZ[i], layerA, layerB);
+    } else {
+      for (let i = 0; i < layer.length; i++)
+        layer.setZ(domain, i, inputZ[i], layerA, layerB);
+    }
+  }
+
+  overwriteLayerRange(layer, domain, inputZ, i0, i1, taperW) {
+    if (this.taper.length != taperW) this.taper = this.calcTaper(taperW);
+
+    let layerA = this.getVisibleLayerAbove(layer);
+    let layerB = this.getVisibleLayerBelow(layer);
+    // values in edit range
+    for (let i = i0; i <= i1; i++) layer.setZ(domain, i, inputZ[i]);
+
+    // tapering
+    for (let i = 1; i < taperW; i++) {
+      var f = this.taper[i];
+      var ia = i1 + i;
+      if (ia < this.length)
+        layer.setZ(
+          domain,
+          ia,
+          f * layer.getZ(domain, ia) + (1 - f) * inputZ[ia],
+          layerA,
+          layerB
+        );
+
+      ia = i0 - i;
+      if (ia >= 0)
+        layer.setZ(
+          domain,
+          ia,
+          f * layer.getZ(domain, ia) + (1 - f) * inputZ[ia],
+          layerA,
+          layerB
+        );
+    }
+  }
+
+  calcTaper(taperW) {
+    const fs = new Array(taperW).fill(0.0);
+    const k = 6;
+    const A0 = 1 / (1 + Math.exp(-k * (0 - 0.5)));
+    const A1 = 1 / (1 + Math.exp(-k * (1 - 0.5)));
+    const B0 = A1 - A0;
+    for (let i = 0; i < taperW; i++) {
+      var t = i / (taperW - 1);
+      var A = 1 / (1 + Math.exp(-k * (t - 0.5)));
+      var B = A1 - A;
+      var C = 1 - B / B0;
+      fs[i] = C;
+    }
+    return fs;
+  }
+
   setVerticalRange(domain, min, max) {
     if (domain == Domain.DomDepth) {
       this.minDepth = min;
@@ -199,14 +276,79 @@ export class USection {
     }
   }
 
+  autosetVerticalRanges() {
+    this.minDepth = Number.MAX_VALUE;
+    this.maxDepth = -Number.MIN_VALUE;
+    this.minTime = Number.MAX_VALUE;
+    this.maxTime = -Number.MIN_VALUE;
+
+    this.layers.forEach((layer) => {
+      this.minDepth = Math.min(this.minDepth, layer.minDepth);
+      this.maxDepth = Math.max(this.maxDepth, layer.maxDepth);
+      this.minTime = Math.min(this.minTime, layer.minTime);
+      this.maxTime = Math.max(this.maxTime, layer.maxTime);
+    });
+
+    var dz = (this.maxDepth - this.minDepth) * 0.05;
+    this.minDepth -= dz;
+    this.maxDepth += dz;
+    dz = (this.maxTime - this.minTime) * 0.05;
+    this.minTime -= dz;
+    this.maxTime += dz;
+  }
+
   setLayerVisible(layerName, viz) {
     this.layers.forEach((layer) => {
       if (layer.name == layerName) {
         layer.visible = viz;
-        console.log(layer.name + " : " + viz);
         return;
       }
     });
+  }
+
+  setCompartmentRestriction(layerName, isRestricted) {
+    this.layers.forEach((layer) => {
+      if (layer.name == layerName) {
+        layer.isRestricted = isRestricted;
+        return;
+      }
+    });
+  }
+
+  ensureHChasThickness() {
+    var anyZeroThicknessHC = false;
+    this.visibleContactLayers.forEach((layer) => {
+      var layerA = this.getVisibleLayerAbove(layer);
+      if (layerA != null && !layer.isAnyDeeperThan(layerA))
+        anyZeroThicknessHC = true;
+    });
+
+    if (anyZeroThicknessHC == false) return; // no need to do anything
+
+    var DEPTH_INCREMENT = 100;
+    var adjusted = true;
+
+    while (adjusted) {
+      adjusted = false;
+
+      this.visibleContactLayers.forEach((layer) => {
+        var layerA = this.getVisibleLayerAbove(layer);
+        var maxThick = layer.maximumThicknessBetween(layerA);
+
+        // move all that have thin thickess downward
+        if (maxThick < DEPTH_INCREMENT) {
+          adjusted = true;
+          // push it down some
+          layer.contactControlDepth += DEPTH_INCREMENT;
+        }
+      });
+
+      if (adjusted) {
+        // flatten out again
+        // flatten and test again...
+        this.flattenContacts();
+      }
+    }
   }
 
   get visibleLayers() {
@@ -222,6 +364,13 @@ export class USection {
     return this.layers.filter(
       (item) => item.visible === true && item.isContact == true
     );
+  }
+
+  get mudlineLayer() {
+    return this.layers[1];
+  }
+  get waterLayer() {
+    return this.layers[0];
   }
 
   getVisibleRegularLayerAbove(layer) {
@@ -268,55 +417,54 @@ export class USection {
     return null;
   }
 
-  adjustContactDepth(editLayer, rZ, idx, restrictBelow) {
-    editLayer.contactControlDepth = rZ;
-    editLayer.contactControlIndex = idx;
+  adjustContactDepth(layer, rZ, idx, restrictBelow) {
+    layer.contactControlDepth = rZ;
+    layer.contactControlIndex = idx;
 
-    //console.log("moveContact: " + editLayer.name + " : " + rZ + " " + idx);
-    let layerA = this.getVisibleLayerAbove(editLayer);
-    let layerB = this.getVisibleLayerBelow(editLayer);
+    let layerA = this.getVisibleLayerAbove(layer);
+    let layerB = this.getVisibleLayerBelow(layer);
 
     // depth limit contact
-    for (let i = 0; i < editLayer.length; i++) {
+    for (let i = 0; i < layer.length; i++) {
       var minZ = layerA.point[i].depth;
       var maxZ = layerB != null ? layerB.point[i].depth : 9999999999;
-      editLayer.point[i].depth = clamp(rZ, minZ, maxZ);
+      layer.point[i].depth = clamp(rZ, minZ, maxZ);
     }
 
-    layerA = this.getVisibleRegularLayerAbove(editLayer);
-    layerB = this.getVisibleRegularLayerBelow(editLayer);
-    for (let i = 0; i < editLayer.length; i++) {
+    layerA = this.getVisibleRegularLayerAbove(layer);
+    layerB = this.getVisibleRegularLayerBelow(layer);
+    for (let i = 0; i < layer.length; i++) {
       var minZ = layerA.point[i].depth;
       var maxZ =
         restrictBelow && layerB != null ? layerB.point[i].depth : 9999999999;
-      editLayer.point[i].depth = clamp(editLayer.point[i].depth, minZ, maxZ);
+      layer.point[i].depth = clamp(layer.point[i].depth, minZ, maxZ);
     }
 
     // then restrict compartment? [option?]
-    var restrictCompartment = false;
+    var restrictCompartment = layer.isRestricted;
     if (restrictCompartment) {
-      layerA = this.getVisibleRegularLayerAbove(editLayer);
-      if (editLayer.point[idx].depth > layerA.point[idx].depth) {
+      layerA = this.getVisibleRegularLayerAbove(layer);
+      if (layer.point[idx].depth > layerA.point[idx].depth) {
         // find extent
         var compartmentIdxA = 0;
         for (let i = idx; i >= 0; i--) {
-          if (editLayer.point[i].depth <= layerA.point[i].depth) {
+          if (layer.point[i].depth <= layerA.point[i].depth) {
             compartmentIdxA = i;
             break;
           }
         }
 
-        var compartmentIdxB = editLayer.length - 1;
-        for (let i = idx; i < editLayer.length; i++) {
-          if (editLayer.point[i].depth <= layerA.point[i].depth) {
+        var compartmentIdxB = layer.length - 1;
+        for (let i = idx; i < layer.length; i++) {
+          if (layer.point[i].depth <= layerA.point[i].depth) {
             compartmentIdxB = i;
             break;
           }
         }
 
-        for (let i = 0; i < editLayer.length; i++) {
+        for (let i = 0; i < layer.length; i++) {
           if (i < compartmentIdxA || i > compartmentIdxB)
-            editLayer.point[i].depth = layerA.point[i].depth;
+            layer.point[i].depth = layerA.point[i].depth;
         }
       }
     }
@@ -362,20 +510,21 @@ export class USection {
     }
 
     // water at zero always
-    let waterLayer = this.layers[0];
-    let mudlineLayer = this.layers[1];
-
     for (let i = 0; i < this.length; i++) {
-      waterLayer.point[i].depth = Math.min(mudlineLayer.point[i].depth, 0.0);
+      this.waterLayer.point[i].depth = Math.min(
+        this.mudlineLayer.point[i].depth,
+        0.0
+      );
     }
-    waterLayer.setToConstant(Domain.DomTime, 0);
+    this.waterLayer.setToConstant(Domain.DomTime, 0);
     // top layer with simple water velocity
-    let v0 = waterLayer.v0;
+    let v0 = this.waterLayer.v0;
     for (let i = 0; i < this.length; i++) {
-      if (mudlineLayer.point[i].depth > 0)
+      if (this.mudlineLayer.point[i].depth > 0)
         // mudline: seawater velocity
-        mudlineLayer.point[i].time = (mudlineLayer.point[i].depth * 2000) / v0;
-      else mudlineLayer.point[i].time = 0.0; // it's at surface, elevated
+        this.mudlineLayer.point[i].time =
+          (this.mudlineLayer.point[i].depth * 2000) / v0;
+      else this.mudlineLayer.point[i].time = 0.0; // it's at surface, elevated
     }
     // the rest..
     for (let j = 2; j < this.visibleLayers.length; j++) {
@@ -385,7 +534,7 @@ export class USection {
       for (let i = 0; i < this.length; i++) {
         let ptA = layerA.point[i];
         let ptB = layerB.point[i];
-        let ptML = mudlineLayer.point[i];
+        let ptML = this.mudlineLayer.point[i];
         ptB.time = DepthToTime(
           ptA.time,
           ptA.depth,
@@ -398,21 +547,21 @@ export class USection {
 
       if (finalLayer == layerB) return;
     }
+    this.autosetVerticalRanges();
   }
 
   update_DepthFromTime(finalLayer) {
     this.setupVelocityLayers();
 
     // water at zero always
-    let waterLayer = this.layers[0];
-    waterLayer.setToConstant(Domain.DomDepth, 0);
-    waterLayer.setToConstant(Domain.DomTime, 0);
+    this.waterLayer.setToConstant(Domain.DomDepth, 0);
+    this.waterLayer.setToConstant(Domain.DomTime, 0);
 
     // top layer with simple water velocity
-    let v0 = waterLayer.v0;
-    let mudlineLayer = this.layers[1];
+    let v0 = this.waterLayer.v0;
     for (let i = 0; i < this.length; i++) {
-      mudlineLayer.point[i].depth = (v0 * mudlineLayer.point[i].time) / 2000;
+      this.mudlineLayer.point[i].depth =
+        (v0 * this.mudlineLayer.point[i].time) / 2000;
     }
 
     // the rest..
@@ -423,7 +572,7 @@ export class USection {
       for (let i = 0; i < this.length; i++) {
         let ptA = layerA.point[i];
         let ptB = layerB.point[i];
-        let ptML = mudlineLayer.point[i];
+        let ptML = this.mudlineLayer.point[i];
         ptB.depth = TimeToDepth(
           ptA.depth,
           ptA.time,
@@ -436,6 +585,7 @@ export class USection {
 
       if (finalLayer == layerB) return;
     }
+    this.autosetVerticalRanges();
   }
 
   setupVelocityLayers() {
@@ -479,14 +629,13 @@ export class USection {
     if (idx < 0) return NaN;
     if (idx >= this.length) return NaN;
     var vizLayers = this.visibleLayers;
-    let mudlineLayer = this.layers[1];
     for (let i = vizLayers.length - 1; i >= 0; i--) {
       var layerA = vizLayers[i];
       if (depth >= layerA.point[idx].depth) {
         // therefore tA, dA above pointer
         var tA = layerA.point[idx].time;
         var dA = layerA.point[idx].depth;
-        let ptML = mudlineLayer.point[idx];
+        let ptML = this.mudlineLayer.point[idx];
         // therefore time
         var time = DepthToTime(
           tA,
@@ -508,14 +657,13 @@ export class USection {
     if (idx < 0) return NaN;
     if (idx >= this.length) return NaN;
     var vizLayers = this.visibleLayers;
-    let mudlineLayer = this.layers[1];
     for (let i = vizLayers.length - 1; i >= 0; i--) {
       var layerA = vizLayers[i];
       if (time >= layerA.point[idx].time) {
         // therefore tA, dA above pointer
         var tA = layerA.point[idx].time;
         var dA = layerA.point[idx].depth;
-        let ptML = mudlineLayer.point[idx];
+        let ptML = this.mudlineLayer.point[idx];
         // therefore depth
         var depth = TimeToDepth(
           dA,
@@ -532,17 +680,17 @@ export class USection {
     return NaN;
   }
 
-  getVelocityAtTime(time, idx) {
+  getVelocityAtTimeDepth(time, depth, idx) {
     // get the layer pointer is in
     if (idx < 0) return NaN;
     if (idx >= this.length) return NaN;
     var vizLayers = this.visibleLayers;
-    let mudlineLayer = this.layers[1];
 
     for (let i = vizLayers.length - 1; i >= 0; i--) {
       var layerA = vizLayers[i];
-      if (time >= layerA.point[idx].time) {
-        let ptML = mudlineLayer.point[idx];
+      if (depth >= layerA.point[idx].depth) {
+        let ptML = this.mudlineLayer.point[idx];
+
         // therefore velocity
         return VelocityAtTime(
           time,
@@ -553,10 +701,10 @@ export class USection {
       }
     }
 
-    return NaN;
+    return 343;
   }
 
-  setCursor(t, d, v, i) {
+  setCursor(t, d, i) {
     if (i < 0) i = -1;
     if (i >= this.length) i = -1;
 
@@ -564,7 +712,7 @@ export class USection {
       this.pointerTime = t;
       this.pointerDepth = d;
       this.pointerIndex = i;
-      this.pointerVelocity = v;
+      this.pointerVelocity = this.getVelocityAtTimeDepth(t, d, i);
     } else {
       this.pointerTime = NaN;
       this.pointerDepth = NaN;
@@ -575,11 +723,11 @@ export class USection {
 
   drawSection(domain, name) {
     var canvas = document.getElementById(name);
-    var context = canvas.getContext("2d");
+    var ctx = canvas.getContext("2d");
     canvas.height = CANVAS_H;
     canvas.width = window.innerWidth;
-    context.clearRect(0, 0, window.innerWidth, CANVAS_H);
-    context.save();
+    ctx.clearRect(0, 0, window.innerWidth, CANVAS_H);
+    ctx.save();
 
     var w = canvas.width - this.x0;
     var h = canvas.height;
@@ -604,7 +752,7 @@ export class USection {
     this.visibleLayers.forEach((layer) => {
       layer.yValues = layer.convertToScreenY(domain, h, minZ, maxZ);
       this.plotSurface(
-        context,
+        ctx,
         this.xValues,
         layer.yValues,
         "dimgray",
@@ -616,7 +764,7 @@ export class USection {
 
     this.visibleLayers.forEach((layer) => {
       this.plotSurface(
-        context,
+        ctx,
         this.xValues,
         layer.yValues,
         "dimgray",
@@ -636,22 +784,23 @@ export class USection {
         var sx = this.toScreenX(this.pointerIndex, w);
       }
 
-      context.beginPath();
-      context.strokeStyle = "rgba(255,0,0, 1)";
-      context.lineWidth = 1;
-      context.moveTo(sx + 10, sy);
-      context.lineTo(sx - 10, sy);
-      context.stroke();
-      context.moveTo(sx, sy - 10);
-      context.lineTo(sx, sy + 10);
-      context.stroke();
+      var siz = 3;
+      ctx.beginPath();
+      ctx.strokeStyle = "rgb(255,0,0)";
+      ctx.lineWidth = 1;
+      ctx.moveTo(sx + siz, sy);
+      ctx.lineTo(sx - siz, sy);
+      ctx.stroke();
+      ctx.moveTo(sx, sy - siz);
+      ctx.lineTo(sx, sy + siz);
+      ctx.stroke();
     }
 
     // labels
-    context.font = "12px exo";
-    context.textAlign = "right";
-    context.textBaseline = "middle";
-    context.fillStyle = "black";
+    ctx.font = "12px exo";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "black";
 
     var n = this.visibleRegularLayers.length;
     for (let index = 0; index < n; index++) {
@@ -659,10 +808,82 @@ export class USection {
       const aY = layerA.yValues[0];
       const bY =
         index + 1 < n ? this.visibleRegularLayers[index + 1].yValues[0] : h;
-      context.fillText(layerA.name, this.x0 - 5, (aY + bY) / 2);
+      ctx.fillText(layerA.name, this.x0 - 5, (aY + bY) / 2);
     }
 
-    this.drawFrame(context, w, h);
+    // zero line if reqd
+    // if (domain == Domain.DomDepth && this.mudlineLayer.minDepth < 0.0) {
+    //   ctx.save();
+
+    //   const yValues = this.mudlineLayer.yValues;
+    //   ctx.beginPath();
+    //   for (var i = 0; i < this.xValues.length; i++) {
+    //     var x = this.xValues[i];
+    //     var y = yValues[i];
+    //     if (i === 0) ctx.moveTo(x, y);
+    //     else ctx.lineTo(x, y);
+    //   }
+    //   ctx.lineTo(x, h);
+    //   ctx.lineTo(this.xValues[0], h);
+    //   ctx.closePath();
+    //   /// define this Path as clipping mask
+    //   ctx.clip();
+    //   var sy = toScreenY(0, h, minZ, maxZ);
+    //   ctx.lineWidth = 0.5;
+    //   ctx.setLineDash([5, 5]);
+    //   ctx.strokeStyle = "rgba(0,0,0, 0.5)";
+    //   ctx.beginPath();
+    //   ctx.moveTo(this.x0, sy);
+    //   ctx.lineTo(canvas.width, sy);
+    //   ctx.stroke();
+    //   ctx.setLineDash([]);
+    //   /// reset clip to default
+    //   ctx.restore();
+    // }
+
+    this.drawgrid(ctx, canvas.width, h, minZ, maxZ);
+    this.drawFrame(ctx, w, h);
+  }
+
+  drawgrid(ctx, w, h, minZ, maxZ) {
+    var dZ = this.getGridVerticalIncrement(minZ, maxZ);
+
+    var z0 = Math.floor(minZ / dZ) * dZ;
+    ctx.lineWidth = 0.5;
+    ctx.strokeStyle = "rgba(110,110,255, 0.5)";
+
+    ctx.font = "10px exo";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "blue";
+
+    for (var i = 0; i < 30; i++) {
+      var z = z0 + i * dZ;
+      if (z > maxZ) break;
+      var sy = toScreenY(z, h, minZ, maxZ);
+      ctx.beginPath();
+      ctx.moveTo(this.x0 + 28, sy);
+      ctx.lineTo(w, sy);
+      ctx.stroke();
+
+      ctx.fillText(z, this.x0 + 2, sy);
+    }
+  }
+
+  getGridVerticalIncrement(minZ, maxZ) {
+    var dZ = (maxZ - minZ) / 10;
+
+    for (var i = 0; i < 5; i++) {
+      var b = Math.pow(10, i);
+      // 1,2,5
+      var v = b * 1;
+      if (dZ < v) return v;
+      v = b * 2;
+      if (dZ < v) return v;
+      v = b * 5;
+      if (dZ < v) return v;
+    }
+    return 1000;
   }
 
   drawFrame(ctx, w, h) {

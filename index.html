@@ -5,27 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <style>
-        .form-group {
-            margin-bottom: 15px;
-            display: inline-block;
-            margin-right: 20px;
-            margin-left: 80px;
-            /* Optional: Add some space between the groups */
-        }
-
-        label {
-            display: block;
-            margin-bottom: 5px;
-        }
-
-        select {
-            width: 200px;
-            padding: 5px;
-        }
-    </style>
-
-    <title>Quick Tool Resurection</title>
+    <title>Quiacito Demo Tool</title>
     <link rel="stylesheet" href="style.css" type="text/css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -35,11 +15,15 @@
 <!--<body onload="init()"> -->
 
 <body>
+    <h1>
+        <img id="logo"
+            src="https://www.qintegral.com.au/templates/g5_helium/custom/images/qintegral_web_top_logo_300px.jpg"
+            alt="Your Logo">
 
-    <h1>WEBICITO</h1>
-    <p>Edit layers with mouse</p>
+        Quiacito&trade; Demo Tool
+    </h1>
 
-
+    <p>Edit layers in TIME or DEPTH panels with mouse. +Ctrl for flat layers, +Shift+Ctrl moves whole layer.</p>
     <h3>TIME</h3>
     <canvas id="canvasTime"></canvas>
     <div id="rightSpace"></div>
@@ -56,6 +40,11 @@
             <option value="gas">Gas</option>
             <option value="oil_gas">Oil & Gas</option>
         </select>
+        <div class="checkbox-container">
+            <!-- Your checkbox -->
+            <input type="checkbox" id="myCheckboxA">
+            <label class="checkbox-label" for="myCheckboxA">Restrict compartment</label>
+        </div>
     </div>
 
 
@@ -68,19 +57,29 @@
             <option value="gas">Gas</option>
             <option value="oil_gas">Oil & Gas</option>
         </select>
+        <div class="checkbox-container">
+            <!-- Your checkbox -->
+            <input type="checkbox" id="myCheckboxB">
+            <label class="checkbox-label" for="myCheckboxB">Restrict compartment</label>
+        </div>
+    </div>
+    <div class="form-group">
+        <p id="pointerOutput-Time" class="custom-paragraph">time</p>
+        <p id="pointerOutput-Depth" class="custom-paragraph">depth</p>
+        <p id="pointerOutput-Velocity" class="custom-paragraph">velocity</p>
+
     </div>
     <script type="module">
-
         import { changedHydrocarbon } from './script.js';
+        import { changedCompartment } from './script.js';
         document.getElementById("hcSelectorA").addEventListener("change", changedHydrocarbon);
         document.getElementById("hcSelectorB").addEventListener("change", changedHydrocarbon);
+
+        document.getElementById("myCheckboxA").addEventListener("change", changedCompartment);
+        document.getElementById("myCheckboxB").addEventListener("change", changedCompartment);
     </script>
 
 
-    <p id="demo"></p>
-
-
-    <!-- <script type="module" src="ZLoc.js"></script> -->
 
 </body>
 

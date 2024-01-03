@@ -1,11 +1,47 @@
 body {
   background-color: rgb(255, 255, 255);
   font-family: "Exo", sans-serif;
-
-  overflow: hidden; /* Prevent scrolling */
-  touch-action: none; /* Disable default touch actions */
 }
 
+.form-group {
+  /* Optional: Add some space between the groups */
+  display: inline-block;
+  margin-top: 10px;
+  margin-right: 0px;
+  margin-left: 80px;
+  vertical-align: top; /* Align form groups at the top */
+  /* Optional: Add some space between the groups */
+}
+
+label {
+  display: block;
+  margin-bottom: 5px;
+}
+
+select {
+  width: 200px;
+  padding: 5px;
+}
+
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  margin: 0px; /* Optional: Add some margin */
+  margin-top: 15px;
+}
+
+/* Style for the label */
+.checkbox-label {
+  color: #333;
+  margin-left: 2px; /* Optional: Add some spacing between checkbox and label */
+  margin-bottom: 0px;
+}
+
+.custom-paragraph {
+  color: hsl(318, 66%, 52%);
+  padding: 0px;
+  margin: 2px;
+}
 canvas {
   margin-left: 0px;
   margin-right: 10px;
@@ -16,7 +52,21 @@ canvas {
   padding: 0;
 }
 
-h1,
+/* Style for logo */
+#logo {
+  width: 300px; /* Set the width of your logo */
+  height: auto; /* Maintain aspect ratio */
+  margin: 10px; /* Optional: Add some margin */
+  margin-right: 130px; /* Optional: Add some spacing between logo and title */
+}
+
+/* Style for the title */
+h1 {
+  display: flex; /* Use flexbox for layout */
+  align-items: center; /* Center items vertically */
+  color: #277a66;
+}
+
 h2 {
   color: #277a66; /* Red color (replace with your desired color code) */
 }
@@ -28,12 +78,4 @@ h3 {
 
 p {
   color: hsl(0, 39%, 23%);
-}
-
-#myChart {
-  background-color: lightblue;
-}
-
-a {
-  background-color: white;
 }
