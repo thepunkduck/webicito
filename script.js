@@ -57,7 +57,10 @@ function init() {
   canvas.addEventListener("mousemove", moveEditTIME);
   canvas.addEventListener("mouseup", endEdit);
   canvas.addEventListener("mouseout", mouseOut);
-  canvas.addEventListener("touchmove", touchmove);
+  canvas.addEventListener("touchstart", startEditTIME);
+  canvas.addEventListener("touchmove", moveEditTIME);
+  canvas.addEventListener("touchend", endEdit);
+
   uSection.canvasTime = canvas;
 
   canvas = document.getElementById("canvasDepth");
@@ -65,8 +68,22 @@ function init() {
   canvas.addEventListener("mousemove", moveEditDEPTH);
   canvas.addEventListener("mouseup", endEdit);
   canvas.addEventListener("mouseout", mouseOut);
-  canvas.addEventListener("touchmove", touchmove);
+  canvas.addEventListener("touchstart", startEditDEPTH);
+  canvas.addEventListener("touchmove", moveEditDEPTH);
+  canvas.addEventListener("touchend", endEdit);
+
   uSection.canvasDepth = canvas;
+
+  // Prevent scrolling on touchscreen devices
+  document.body.addEventListener(
+    "touchmove",
+    function (e) {
+      if (editingDomain != Domain.None) {
+        e.preventDefault();
+      }
+    },
+    { passive: false }
+  );
 
   document.addEventListener("DOMContentLoaded", function () {
     addOutsideEventListener("canvasTime");
@@ -181,9 +198,6 @@ function mouseOut(e) {
   uSection.pointerDomain = Domain.None;
   uSection.setCursor(NaN, NaN, -1);
   showOut();
-}
-function touchmove(e) {
-  console.log("touchmove : " + e.x + " , " + e.y);
 }
 
 function startEdit(domain, e) {

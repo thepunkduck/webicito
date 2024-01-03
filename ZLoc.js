@@ -904,9 +904,13 @@ export class USection {
     var scaleX = canvas.width / rect.width;
     var scaleY = canvas.height / rect.height;
 
-    var mouseX = (e.clientX - rect.left) * scaleX;
-    var mouseY = (e.clientY - rect.top) * scaleY;
+    const x = e.clientX || e.touches[0].clientX;
+    const y = e.clientY || e.touches[0].clientY;
 
+    var mouseX = (x - rect.left) * scaleX;
+    var mouseY = (y - rect.top) * scaleY;
+
+    //console.log("XY: " + mouseX + ", " + mouseY);
     return { x: mouseX, y: mouseY };
   }
 
