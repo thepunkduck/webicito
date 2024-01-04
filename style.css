@@ -149,3 +149,30 @@ nav {
   border-radius: 5px;
   font-size: 1em;
 }
+
+header {
+  color: #fff;
+  padding: 10px;
+  text-align: center;
+  display: flex;
+  justify-content: space-between; /* Space between logo and title */
+  align-items: center;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+}
+
+.logo-link {
+  display: inline-block;
+}
+
+.logo-img {
+  max-width: 100%;
+  height: auto;
+}
+
+.title {
+  margin-left: 20px; /* Adjust as needed for spacing between logo and title */
+}

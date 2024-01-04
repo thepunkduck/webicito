@@ -754,7 +754,7 @@ export class USection {
   drawSection(domain, name) {
     var canvas = document.getElementById(name);
     var ctx = canvas.getContext("2d");
-    canvas.height = (window.innerHeight - 70) / 2;
+    canvas.height = (window.innerHeight - 120) / 2;
     canvas.width = window.innerWidth;
     ctx.clearRect(0, 0, window.innerWidth, canvas.height);
     ctx.save();
