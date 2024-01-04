@@ -5,7 +5,7 @@ import { SEAWATER } from "./ZLoc.js";
 var LAYER_WIDTH = 200;
 var SMOOTH_WIN = 5;
 var TAPER_WIN = 1;
-var uSection;
+var uSection = null;
 
 var mX = 0;
 var mY = 0;
@@ -31,26 +31,7 @@ init();
 function init() {
   console.log("init!!!");
 
-  TAPER_WIN = Math.floor(SMOOTH_WIN / 2);
   TAPER_WIN = SMOOTH_WIN;
-  var gasDV = 500;
-  var oilDV = 240;
-  uSection = new USection(LAYER_WIDTH);
-  uSection.addLayer(SEAWATER, "lightblue", 1500, 0, false, 0.0);
-  uSection.addLayer("Claystone", "tan", 1600, 0.41, false, 300.0);
-  uSection.addLayer("Sandstone A", "lightyellow", 2000, 0.515, false, 1000.0);
-  uSection.addLayer("GasA", "darkred", 1500 - gasDV, 0.01, true, 1100.0);
-  uSection.addLayer("OilA", "darkgreen", 1500 - oilDV, 0.01, true, 1200.0);
-  uSection.addLayer("Salt", "deepskyblue", 4500, 0.0, false, 1700.0);
-  uSection.addLayer("Sandstone B", "lightyellow", 2000, 0.515, false, 2500.0);
-  uSection.addLayer("GasB", "darkred", 1500 - gasDV, 0.01, true, 2600.0);
-  uSection.addLayer("OilB", "darkgreen", 1500 - oilDV, 0.01, true, 2700.0);
-  uSection.addLayer("Basement", "darkviolet", 4500, 1.1, false, 3500.0);
-
-  uSection.setVerticalRange(Domain.DomDepth, -200.0, 5000.0);
-  uSection.setVerticalRange(Domain.DomTime, -200.0, 4000.0);
-  changedHydrocarbon();
-  uSection.update_TimeFromDepth(null);
 
   let canvas = document.getElementById("canvasTime");
   canvas.addEventListener("mousedown", startEditTIME);
@@ -61,8 +42,6 @@ function init() {
   canvas.addEventListener("touchmove", moveEditTIME);
   canvas.addEventListener("touchend", endEdit);
 
-  uSection.canvasTime = canvas;
-
   canvas = document.getElementById("canvasDepth");
   canvas.addEventListener("mousedown", startEditDEPTH);
   canvas.addEventListener("mousemove", moveEditDEPTH);
@@ -71,8 +50,6 @@ function init() {
   canvas.addEventListener("touchstart", startEditDEPTH);
   canvas.addEventListener("touchmove", moveEditDEPTH);
   canvas.addEventListener("touchend", endEdit);
-
-  uSection.canvasDepth = canvas;
 
   // Prevent scrolling on touchscreen devices
   document.body.addEventListener(
@@ -92,6 +69,50 @@ function init() {
 
   window.requestAnimationFrame(draw);
   window.addEventListener("resize", resizeCanvas, false);
+
+  resetSection();
+}
+
+export function resetSection() {
+  dismissMenu();
+
+  var gasDV = 500;
+  var oilDV = 240;
+
+  var last_showLayerNames = uSection != null ? uSection.showLayerNames : true;
+
+  uSection = new USection(LAYER_WIDTH);
+  uSection.addLayer(SEAWATER, "lightblue", 1500, 0, false, 0.0);
+  uSection.addLayer("Claystone", "tan", 1600, 0.41, false, 300.0);
+  uSection.addLayer("Sandstone A", "lightyellow", 2000, 0.515, false, 1000.0);
+  uSection.addLayer("GasA", "darkred", 1500 - gasDV, 0.01, true, 1100.0);
+  uSection.addLayer("OilA", "darkgreen", 1500 - oilDV, 0.01, true, 1200.0);
+  uSection.addLayer("Salt", "deepskyblue", 4500, 0.0, false, 1700.0);
+  uSection.addLayer("Sandstone B", "lightyellow", 2000, 0.515, false, 2500.0);
+  uSection.addLayer("GasB", "darkred", 1500 - gasDV, 0.01, true, 2600.0);
+  uSection.addLayer("OilB", "darkgreen", 1500 - oilDV, 0.01, true, 2700.0);
+  uSection.addLayer("Basement", "darkviolet", 4500, 1.1, false, 3500.0);
+
+  uSection.setVerticalRange(Domain.DomDepth, -200.0, 5000.0);
+  uSection.setVerticalRange(Domain.DomTime, -200.0, 4000.0);
+
+  let canvas = document.getElementById("canvasTime");
+  uSection.canvasTime = canvas;
+
+  canvas = document.getElementById("canvasDepth");
+  uSection.canvasDepth = canvas;
+  uSection.showLayerNames = last_showLayerNames;
+
+  document.getElementById("gasA").checked = false;
+  document.getElementById("gasB").checked = false;
+  document.getElementById("oilA").checked = false;
+  document.getElementById("oilB").checked = false;
+  document.getElementById("resA").checked = false;
+  document.getElementById("resB").checked = false;
+  document.getElementById("layerNames").checked = uSection.showLayerNames;
+
+  changedHydrocarbon();
+  uSection.update_TimeFromDepth(null);
 }
 
 function addOutsideEventListener(canvasName) {
@@ -114,7 +135,13 @@ export function toggleMenu() {
   menuList.classList.toggle("active");
 }
 
+export function dismissMenu() {
+  const menuList = document.querySelector(".menu-list");
+  menuList.classList.remove("active");
+}
+
 export function checkboxChanged() {
+  dismissMenu();
   changedHydrocarbon();
 }
 
@@ -190,6 +217,7 @@ function mouseOut(e) {
 }
 
 function startEdit(domain, e) {
+  dismissMenu();
   let coord = uSection.handleXY(domain, e);
   mX = coord.x;
   mY = coord.y;

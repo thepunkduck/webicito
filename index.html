@@ -27,6 +27,7 @@
                 <li><label><input type="checkbox" id="oilB"> Oil B</label></li>
                 <li><label><input type="checkbox" id="resB"> Restrict B</label></li>
                 <li><label><input type="checkbox" id="layerNames" checked> Show Layer Names</label></li>
+                <li class="reset-button" id="reset">Reset</li>
             </ul>
         </ul>
     </nav>
@@ -56,15 +57,16 @@
         import { changedHydrocarbon } from './script.js';
         import { changedCompartment } from './script.js';
         import { toggleMenu } from './script.js';
+        import { dismissMenu } from './script.js';
+        import { resetSection } from './script.js';
         import { checkboxChanged } from './script.js';
 
         document.querySelector('.menu-icon').addEventListener('click', toggleMenu);
-
+        document.querySelector('.reset-button').addEventListener('click', resetSection);
         // Add event listener to all checkboxes during initialization
         document.querySelectorAll('.sub-menu input').forEach(function (checkbox) {
             checkbox.addEventListener('change', checkboxChanged);
         });
-
 
 
     </script>

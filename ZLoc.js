@@ -56,6 +56,35 @@ function DepthToTime(tA, dA, dB, v0, k, tml) {
   return tA + (2.0 * _s2Ms * (dB - dA)) / v0;
 }
 
+function initializeFloatArray(n) {
+  return new Array(n).fill(0.0);
+}
+
+function findClosestIndex(array, targetValue) {
+  let minDifference = Infinity;
+  let closestIndex = -1;
+
+  for (let i = 0; i < array.length; i++) {
+    const difference = Math.abs(array[i] - targetValue);
+
+    if (difference < minDifference) {
+      minDifference = difference;
+      closestIndex = i;
+    }
+  }
+  return closestIndex;
+}
+
+function clamp(v, minv, maxv) {
+  if (v < minv) return minv;
+  if (v > maxv) return maxv;
+  return v;
+}
+
+function toScreenY(z, height, minZ, maxZ) {
+  return height * ((z - minZ) / (maxZ - minZ));
+}
+
 export class Layer {
   constructor(name, color, v0, k, isContact, length, initDepth) {
     this.name = name;
@@ -1020,33 +1049,4 @@ export class USection {
   toX(sx, width) {
     return Math.round(((sx - this.x0) * (this.length - 1)) / width);
   }
-}
-
-function initializeFloatArray(n) {
-  return new Array(n).fill(0.0);
-}
-
-function findClosestIndex(array, targetValue) {
-  let minDifference = Infinity;
-  let closestIndex = -1;
-
-  for (let i = 0; i < array.length; i++) {
-    const difference = Math.abs(array[i] - targetValue);
-
-    if (difference < minDifference) {
-      minDifference = difference;
-      closestIndex = i;
-    }
-  }
-  return closestIndex;
-}
-
-function clamp(v, minv, maxv) {
-  if (v < minv) return minv;
-  if (v > maxv) return maxv;
-  return v;
-}
-
-function toScreenY(z, height, minZ, maxZ) {
-  return height * ((z - minZ) / (maxZ - minZ));
 }
