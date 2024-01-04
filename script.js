@@ -107,56 +107,45 @@ function addOutsideEventListener(canvasName) {
     });
   });
 }
+
+export function toggleMenu() {
+  console.log("toggle");
+  const menuList = document.querySelector(".menu-list");
+  menuList.classList.toggle("active");
+}
+
+export function checkboxChanged() {
+  changedHydrocarbon();
+}
+
 export function changedCompartment() {
   changedHydrocarbon();
 }
 export function changedHydrocarbon() {
-  var hcA = document.getElementById("hcSelectorA").value;
-  var hcB = document.getElementById("hcSelectorB").value;
-  var chkA = document.getElementById("myCheckboxA");
-  var chkB = document.getElementById("myCheckboxB");
   var oilA = false;
   var oilB = false;
   var gasA = false;
   var gasB = false;
-  switch (hcA) {
-    case "oil":
-      oilA = true;
-      break;
-    case "gas":
-      gasA = true;
-      break;
-    case "oil_gas":
-      oilA = true;
-      gasA = true;
-      break;
-    case "none":
-      break;
-  }
-  switch (hcB) {
-    case "oil":
-      oilB = true;
-      break;
-    case "gas":
-      gasB = true;
-      break;
-    case "oil_gas":
-      oilB = true;
-      gasB = true;
-      break;
-    case "none":
-      break;
-  }
+
+  gasA = document.getElementById("gasA").checked;
+  gasB = document.getElementById("gasB").checked;
+  oilA = document.getElementById("oilA").checked;
+  oilB = document.getElementById("oilB").checked;
+  var resA = document.getElementById("resA").checked;
+  var resB = document.getElementById("resB").checked;
+  var layerNames = document.getElementById("layerNames").checked;
 
   uSection.setLayerVisible("OilA", oilA);
   uSection.setLayerVisible("OilB", oilB);
   uSection.setLayerVisible("GasA", gasA);
   uSection.setLayerVisible("GasB", gasB);
 
-  uSection.setCompartmentRestriction("OilA", chkA.checked);
-  uSection.setCompartmentRestriction("OilB", chkB.checked);
-  uSection.setCompartmentRestriction("GasA", chkA.checked);
-  uSection.setCompartmentRestriction("GasB", chkB.checked);
+  uSection.setCompartmentRestriction("OilA", resA);
+  uSection.setCompartmentRestriction("OilB", resB);
+  uSection.setCompartmentRestriction("GasA", resA);
+  uSection.setCompartmentRestriction("GasB", resB);
+
+  uSection.showLayerNames = layerNames;
 
   uSection.flattenContacts();
   uSection.ensureHChasThickness();
@@ -405,36 +394,11 @@ function endEdit(e) {
   wasWholeLayerShift = false;
 }
 
-function showOut() {
-  var BLANK = " ";
-  var txtT = "Time: ";
-  if (uSection.pointerDomain != Domain.None)
-    txtT += isNaN(uSection.pointerTime)
-      ? BLANK
-      : Math.round(uSection.pointerTime) + "ms";
-
-  var txtD = uSection.pointerDepth < 0 ? "Elevation: " : "Depth: ";
-  if (uSection.pointerDomain != Domain.None)
-    txtD += isNaN(uSection.pointerDepth)
-      ? BLANK
-      : Math.abs(Math.round(uSection.pointerDepth)) + "m ";
-
-  var txtV = "Velocity: ";
-  if (uSection.pointerDomain != Domain.None)
-    txtV +=
-      (isNaN(uSection.pointerVelocity)
-        ? BLANK
-        : Math.round(uSection.pointerVelocity)) + "m/s ";
-
-  document.getElementById("pointerOutput-Time").innerHTML = txtT;
-  document.getElementById("pointerOutput-Depth").innerHTML = txtD;
-  document.getElementById("pointerOutput-Velocity").innerHTML = txtV;
-}
+function showOut() {}
 
 function smooth(zArray, win) {
   const n = zArray.length;
   const smoothed = new Array(n).fill(0.0);
-
   const hwin = Math.floor(win / 2);
   for (let j = 0; j < win; j++) {
     var offset = j - hwin;

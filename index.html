@@ -15,68 +15,58 @@
 <!--<body onload="init()"> -->
 
 <body>
+
+    <nav>
+        <div class="menu-icon">&#9776;</div>
+        <ul class="menu-list">
+            <ul class="sub-menu">
+                <li><label><input type="checkbox" id="gasA"> Gas A</label></li>
+                <li><label><input type="checkbox" id="oilA"> Oil A</label></li>
+                <li><label><input type="checkbox" id="resA"> Restrict A</label></li>
+                <li><label><input type="checkbox" id="gasB"> Gas B</label></li>
+                <li><label><input type="checkbox" id="oilB"> Oil B</label></li>
+                <li><label><input type="checkbox" id="resB"> Restrict B</label></li>
+                <li><label><input type="checkbox" id="layerNames" checked> Show Layer Names</label></li>
+            </ul>
+        </ul>
+    </nav>
+
     <h1>
         <img id="logo"
             src="https://www.qintegral.com.au/templates/g5_helium/custom/images/qintegral_web_top_logo_300px.jpg"
-            alt="Your Logo">
+            alt="QIntegral Logo">
 
         Quiacito&trade; Demo Tool
     </h1>
 
-    <p>Edit layers in TIME or DEPTH panels with mouse. +Ctrl for flat layers, +Shift+Ctrl moves whole layer.</p>
-    <h3>TIME</h3>
+    <!--
+       <p>Edit layers in TIME or DEPTH panels with mouse. +Ctrl for flat layers, +Shift+Ctrl moves whole layer.</p>
+
+   -->
+    <h4 class="domain-h4">TIME</h4>
     <canvas id="canvasTime"></canvas>
-    <div id="rightSpace"></div>
 
-    <h3>DEPTH</h3>
+    <div class="invisible-div"></div>
+
+    <h4 class="domain-h4">DEPTH</h4>
     <canvas id="canvasDepth"></canvas>
-    <div id="rightSpace"></div>
-
-    <div class="form-group">
-        <label for="hcSelectorA">Hydrocarbons A:</label>
-        <select id="hcSelectorA">
-            <option value="none">None</option>
-            <option value="oil">Oil</option>
-            <option value="gas">Gas</option>
-            <option value="oil_gas">Oil & Gas</option>
-        </select>
-        <div class="checkbox-container">
-            <!-- Your checkbox -->
-            <input type="checkbox" id="myCheckboxA">
-            <label class="checkbox-label" for="myCheckboxA">Restrict compartment</label>
-        </div>
-    </div>
 
 
-
-    <div class="form-group">
-        <label for="hcSelectorB">Hydrocarbons B:</label>
-        <select id="hcSelectorB">
-            <option value="none">None</option>
-            <option value="oil">Oil</option>
-            <option value="gas">Gas</option>
-            <option value="oil_gas">Oil & Gas</option>
-        </select>
-        <div class="checkbox-container">
-            <!-- Your checkbox -->
-            <input type="checkbox" id="myCheckboxB">
-            <label class="checkbox-label" for="myCheckboxB">Restrict compartment</label>
-        </div>
-    </div>
-    <div class="form-group">
-        <p id="pointerOutput-Time" class="custom-paragraph">time</p>
-        <p id="pointerOutput-Depth" class="custom-paragraph">depth</p>
-        <p id="pointerOutput-Velocity" class="custom-paragraph">velocity</p>
-
-    </div>
     <script type="module">
         import { changedHydrocarbon } from './script.js';
         import { changedCompartment } from './script.js';
-        document.getElementById("hcSelectorA").addEventListener("change", changedHydrocarbon);
-        document.getElementById("hcSelectorB").addEventListener("change", changedHydrocarbon);
+        import { toggleMenu } from './script.js';
+        import { checkboxChanged } from './script.js';
 
-        document.getElementById("myCheckboxA").addEventListener("change", changedCompartment);
-        document.getElementById("myCheckboxB").addEventListener("change", changedCompartment);
+        document.querySelector('.menu-icon').addEventListener('click', toggleMenu);
+
+        // Add event listener to all checkboxes during initialization
+        document.querySelectorAll('.sub-menu input').forEach(function (checkbox) {
+            checkbox.addEventListener('change', checkboxChanged);
+        });
+
+
+
     </script>
 
 

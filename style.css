@@ -3,14 +3,18 @@ body {
   font-family: "Exo", sans-serif;
 }
 
-.form-group {
-  /* Optional: Add some space between the groups */
-  display: inline-block;
-  margin-top: 10px;
-  margin-right: 0px;
-  margin-left: 80px;
-  vertical-align: top; /* Align form groups at the top */
-  /* Optional: Add some space between the groups */
+.paragraph-container {
+  display: flex;
+  justify-content: left;
+  margin-left: 10px;
+}
+
+.custom-paragraph {
+  font-size: 14px;
+  width: 300px;
+  color: hsl(318, 66%, 52%);
+  padding: 0px;
+  margin: 2px;
 }
 
 label {
@@ -37,18 +41,12 @@ select {
   margin-bottom: 0px;
 }
 
-.custom-paragraph {
-  color: hsl(318, 66%, 52%);
-  padding: 0px;
-  margin: 2px;
-}
 canvas {
   margin-left: 0px;
   margin-right: 10px;
   /* Calculate the width to fill available space */
-  width: calc(100% - 10px);
+  width: calc(100% - 5px);
   height: 400;
-  /* Set the fixed height */
   padding: 0;
 }
 
@@ -56,26 +54,87 @@ canvas {
 #logo {
   width: 100px; /* Set the width of your logo */
   height: auto; /* Maintain aspect ratio */
-  margin: 10px; /* Optional: Add some margin */
+  margin: 0px; /* Optional: Add some margin */
   margin-right: 10px; /* Optional: Add some spacing between logo and title */
 }
 
 /* Style for the title */
 h1 {
+  font-size: 20px;
   display: flex; /* Use flexbox for layout */
   align-items: center; /* Center items vertically */
   color: #277a66;
+  margin: 0;
+  padding: 0px;
 }
 
 h2 {
-  color: #277a66; /* Red color (replace with your desired color code) */
+  color: #277a66;
 }
 
 /* Define color for h3 */
 h3 {
-  color: #8b1f40; /* Green color (replace with your desired color code) */
+  color: #921e1e;
+}
+
+.domain-h4 {
+  color: #921e1e;
+  padding: 0px;
+  margin: 0;
+  margin-right: 10px;
+  text-align: right;
+}
+
+.canvas-container {
+  display: flex;
+  align-items: center;
 }
 
 p {
   color: hsl(0, 39%, 23%);
+}
+
+.menu-list {
+  list-style: none;
+  display: none;
+  flex-direction: column;
+  position: absolute;
+  top: 40px;
+  left: -180px;
+  padding: 0px;
+  margin: 0;
+  background-color: #eee;
+}
+
+.menu-list.active {
+  display: flex;
+}
+
+.menu-list li {
+  margin-left: 0px;
+  margin-right: 10px;
+  margin-bottom: 2px;
+  list-style: none;
+}
+
+.sub-menu {
+  margin-left: 0px;
+  margin-right: 0;
+  padding: 0px;
+}
+
+nav {
+  position: fixed;
+  top: 5px;
+  right: 5px;
+  z-index: 1000;
+}
+
+.menu-icon {
+  display: block;
+}
+
+.invisible-div {
+  height: 10px;
+  visibility: hidden;
 }

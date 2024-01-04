@@ -184,6 +184,7 @@ export class USection {
     this.pointerTime = NaN;
     this.pointerVelocity = NaN;
     this.pointerDomain = Domain.None;
+    this.showLayerNames = true;
 
     this.taper = new Array(1).fill(0.0);
   }
@@ -724,11 +725,12 @@ export class USection {
   drawSection(domain, name) {
     var canvas = document.getElementById(name);
     var ctx = canvas.getContext("2d");
-    canvas.height = CANVAS_H;
+    canvas.height = (window.innerHeight - 70) / 2;
     canvas.width = window.innerWidth;
-    ctx.clearRect(0, 0, window.innerWidth, CANVAS_H);
+    ctx.clearRect(0, 0, window.innerWidth, canvas.height);
     ctx.save();
 
+    this.x0 = this.showLayerNames ? LEFT_SPACE : 0;
     var w = canvas.width - this.x0;
     var h = canvas.height;
     // get the vertical range for this domain
@@ -811,37 +813,8 @@ export class USection {
       ctx.fillText(layerA.name, this.x0 - 5, (aY + bY) / 2);
     }
 
-    // zero line if reqd
-    // if (domain == Domain.DomDepth && this.mudlineLayer.minDepth < 0.0) {
-    //   ctx.save();
-
-    //   const yValues = this.mudlineLayer.yValues;
-    //   ctx.beginPath();
-    //   for (var i = 0; i < this.xValues.length; i++) {
-    //     var x = this.xValues[i];
-    //     var y = yValues[i];
-    //     if (i === 0) ctx.moveTo(x, y);
-    //     else ctx.lineTo(x, y);
-    //   }
-    //   ctx.lineTo(x, h);
-    //   ctx.lineTo(this.xValues[0], h);
-    //   ctx.closePath();
-    //   /// define this Path as clipping mask
-    //   ctx.clip();
-    //   var sy = toScreenY(0, h, minZ, maxZ);
-    //   ctx.lineWidth = 0.5;
-    //   ctx.setLineDash([5, 5]);
-    //   ctx.strokeStyle = "rgba(0,0,0, 0.5)";
-    //   ctx.beginPath();
-    //   ctx.moveTo(this.x0, sy);
-    //   ctx.lineTo(canvas.width, sy);
-    //   ctx.stroke();
-    //   ctx.setLineDash([]);
-    //   /// reset clip to default
-    //   ctx.restore();
-    // }
-
     this.drawgrid(ctx, canvas.width, h, minZ, maxZ);
+    this.drawstatus(ctx, canvas.width, h);
     this.drawFrame(ctx, w, h);
   }
 
@@ -868,6 +841,40 @@ export class USection {
 
       ctx.fillText(z, this.x0 + 2, sy);
     }
+  }
+
+  drawstatus(ctx, w, h) {
+    ctx.font = "12px exo";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "bottom";
+    ctx.fillStyle = "white";
+    var x = w - 270; //this.x0 + 5;
+    var y = h;
+
+    var BLANK = " ";
+    var txtT = "Time: ";
+    if (this.pointerDomain != Domain.None)
+      txtT += isNaN(this.pointerTime)
+        ? BLANK
+        : Math.round(this.pointerTime) + "ms";
+
+    var txtD = this.pointerDepth < 0 ? "Elevation: " : "Depth: ";
+    if (this.pointerDomain != Domain.None)
+      txtD += isNaN(this.pointerDepth)
+        ? BLANK
+        : Math.abs(Math.round(this.pointerDepth)) + "m ";
+
+    var txtV = "Velocity: ";
+    if (this.pointerDomain != Domain.None)
+      txtV += isNaN(this.pointerVelocity)
+        ? BLANK
+        : Math.round(this.pointerVelocity) + "m/s";
+
+    ctx.fillText(txtT, x, y);
+    x += 80;
+    ctx.fillText(txtD, x, y);
+    x += 80;
+    ctx.fillText(txtV, x, y);
   }
 
   getGridVerticalIncrement(minZ, maxZ) {
