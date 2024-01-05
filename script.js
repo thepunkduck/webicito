@@ -1,6 +1,6 @@
-import { Domain } from "./ZLoc.js";
-import { USection } from "./ZLoc.js";
-import { SEAWATER } from "./ZLoc.js";
+import { Domain } from "./quiacito.js";
+import { USection } from "./quiacito.js";
+import { SEAWATER } from "./quiacito.js";
 
 var LAYER_WIDTH = 200;
 var SMOOTH_WIN = 7;
