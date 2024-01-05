@@ -1,120 +1,54 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Simple Webpage with Hamburger Menu</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-    }
 
-    header {
-      background-color: #333;
-      color: #fff;
-      padding: 10px;
-      text-align: center;
-    }
-
-    nav {
-      background-color: #eee;
-      padding: 10px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .menu-icon {
-      cursor: pointer;
-    }
-
-    section {
-      padding: 20px;
-    }
-
-    canvas {
-      display: block;
-      width: 100%;
-      height: 150px;
-      background-color: #3498db;
-      margin-top: 20px;
-    }
-
-
-    .menu-list {
-      list-style: none;
-      display: none;
-      flex-direction: column;
-      position: absolute;
-      top: 40px;
-      left: 5px;
-      padding: 0px;
-      margin: 0;
-      background-color: #eee;
-    }
-
-    .menu-list.active {
-      display: flex;
-    }
-
-    .menu-list li {
-      margin-left: 0px;
-      margin-right: 10px;
-      margin-bottom: 2px;
-    }
-
-    .sub-menu {
-      margin-left: 0px;
-      margin-right: 0;
-      padding: 0px;
-    }
-
-
-
-    .menu-icon {
-      display: block;
-    }
-  </style>
+  <title>Quiacito&trade; Demo Tool Help</title>
+  <link rel="stylesheet" href="style.css" type="text/css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Exo:wght@400&display=swap" rel="stylesheet">
 </head>
+
+<!--<body onload="init()"> -->
 
 <body>
 
 
-  <nav>
-    <div class="menu-icon">&#9776;</div>
-    <ul class="menu-list">
-      <ul class="sub-menu">
-        <li><label><input type="checkbox" name="gasA"> Gas A</label></li>
-        <li><label><input type="checkbox" name="oilA"> Oil A</label></li>
-        <li><label><input type="checkbox" name="resA"> Restrict A</label></li>
-        <li><label><input type="checkbox" name="gasB"> Gas B</label></li>
-        <li><label><input type="checkbox" name="oilB"> Oil B</label></li>
-        <li><label><input type="checkbox" name="resB"> Restrict B</label></li>
-      </ul>
-    </ul>
-  </nav>
+  <header>
+    <div class="logo-container">
+      <a href="https://www.qintegral.com.au/" class="logo-link">
+        <img src="https://www.qintegral.com.au/templates/g5_helium/custom/images/qintegral_web_top_logo_300px.jpg"
+          alt="Logo" class="logo-img">
+      </a>
+    </div>
+    <div class="title">
+      <h1>Quiacito&trade; Demo Tool</h1>
+    </div>
+  </header>
 
-  <section>
-    <h2>Welcome to the Simple Webpage!</h2>
-    <p>This is the main content section.</p>
-    <canvas></canvas>
-  </section>
+
+  <p>Edit layers in TIME or DEPTH panels with mouse</p>
+  <p>Mouse +Ctrl for flat layers</p>
+  <p>Mouse +Shift+Ctrl moves whole layer</p>
+
+  <button onclick="goBack()">Back</button>
+
 
   <script>
+    document.getElementById('help').addEventListener('click', function () {
+      // Redirect to the desired URL when the list item is clicked
+      window.location.href = './index.html';
+    });
 
-
-    document.querySelector('.menu-icon').addEventListener('click', toggleMenu);
-
-
-    function toggleMenu() {
-      const menuList = document.querySelector('.menu-list');
-      menuList.classList.toggle('active');
+    function goBack() {
+      // Navigate back to the previous page when the "Back" button is clicked
+      window.history.back();
     }
   </script>
+
 
 </body>
 

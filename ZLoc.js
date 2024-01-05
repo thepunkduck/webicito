@@ -233,8 +233,8 @@ export class USection {
   }
 
   overwriteLayer(layer, domain, inputZ) {
-    let layerA = this.getVisibleLayerAbove(layer);
-    let layerB = this.getVisibleLayerBelow(layer);
+    let layerA = this.getVisibleRegularLayerAbove(layer);
+    let layerB = this.getVisibleRegularLayerBelow(layer);
     if (layer == this.mudlineLayer && domain == Domain.DomDepth) {
       for (let i = 0; i < layer.length; i++)
         layer.setZ(domain, i, inputZ[i], null, layerB);
@@ -577,7 +577,6 @@ export class USection {
 
       if (finalLayer == layerB) return;
     }
-    this.autosetVerticalRanges();
   }
 
   update_DepthFromTime(finalLayer) {
@@ -615,7 +614,6 @@ export class USection {
 
       if (finalLayer == layerB) return;
     }
-    this.autosetVerticalRanges();
   }
 
   setupVelocityLayers() {
@@ -754,7 +752,7 @@ export class USection {
   drawSection(domain, name) {
     var canvas = document.getElementById(name);
     var ctx = canvas.getContext("2d");
-    canvas.height = (window.innerHeight - 120) / 2;
+    canvas.height = (window.innerHeight - 140) / 2;
     canvas.width = window.innerWidth;
     ctx.clearRect(0, 0, window.innerWidth, canvas.height);
     ctx.save();
@@ -989,32 +987,46 @@ export class USection {
   getLayerAtPointer(domain, x, y) {
     let idx = this.getIndex(x);
     if (idx == -1) return null;
-    let minDiff = 99999999;
+    const PIX = 10;
+
+    let minDiff = Number.MAX_VALUE;
     let closeLayer = null;
     let i = -1;
-    if (domain == Domain.DomDepth) {
-      this.visibleLayers.forEach((layer) => {
-        i++;
-        if (i > 0) {
-          let diff = Math.abs(layer.point[idx].screenDepth - y);
-          if (diff < 10 && diff < minDiff) {
-            minDiff = diff;
-            closeLayer = layer;
-          }
+
+    // first select regular if you can
+    this.visibleRegularLayers.forEach((layer) => {
+      i++;
+      if (layer != this.waterLayer) {
+        let sy =
+          domain == Domain.DomDepth
+            ? layer.point[idx].screenDepth
+            : layer.point[idx].screenTime;
+        let diff = Math.abs(sy - y);
+        if (diff < PIX && diff < minDiff) {
+          minDiff = diff;
+          closeLayer = layer;
         }
-      });
-    } else {
-      this.visibleLayers.forEach((layer) => {
-        i++;
-        if (i > 0) {
-          let diff = Math.abs(layer.point[idx].screenTime - y);
-          if (diff < 10 && diff < minDiff) {
-            minDiff = diff;
-            closeLayer = layer;
-          }
-        }
-      });
-    }
+      }
+    });
+
+    if (closeLayer != null) return closeLayer;
+
+    // then contact layers
+    minDiff = Number.MAX_VALUE;
+    closeLayer = null;
+    i = -1;
+    this.visibleContactLayers.forEach((layer) => {
+      i++;
+      let sy =
+        domain == Domain.DomDepth
+          ? layer.point[idx].screenDepth
+          : layer.point[idx].screenTime;
+      let diff = Math.abs(sy - y);
+      if (diff < PIX && diff < minDiff) {
+        minDiff = diff;
+        closeLayer = layer;
+      }
+    });
 
     return closeLayer;
   }

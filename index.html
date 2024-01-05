@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Quiacito Demo Tool</title>
+    <title>Quiacito&trade; Demo Tool</title>
     <link rel="stylesheet" href="style.css" type="text/css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -42,12 +42,41 @@
                 <li><label><input type="checkbox" id="oilB"> Oil B</label></li>
                 <li><label><input type="checkbox" id="resB"> Restrict B</label></li>
                 <li><label><input type="checkbox" id="layerNames" checked> Show Layer Names</label></li>
+                <li class="regular-button" id="help">Help...</li>
+
+
+
                 <li class="reset-button" id="reset">Reset</li>
             </ul>
         </ul>
     </nav>
 
 
+    <!-- Pop-up panel with help text -->
+    <div id="helpPanel">
+        <div id="helpContent">
+            <span class="close" id="closeHelp">&times;</span>
+
+            <p>Quiacito&trade; Demo Tool is a fun thing to show how "flat spots" are not flat!</p>
+            <p>There are 2 panels. The top panel shows a TIME section, such as interpreted seismic, the bottom panel is
+                a depth-converted view. Edits can be made in either panel - causing the other to update. </p>
+            <p>The fun starts when you add some hydrocarbons - in depth the oil/water/gas contacts are obviously flat,
+                but in time it's a rather different story! The effects of the overlying layers can be subtle or
+                dramatic.</p>
+
+            <ul class="helpList">
+
+                <li><label>Edit layers in TIME or DEPTH panels with mouse</label></li>
+                <li><label>Mouse +Ctrl for flat layers</label></li>
+                <li><label>Mouse +Shift+Ctrl moves whole layer</label></li>
+                <li><label>Checkboxes for hydrocarbons</label></li>
+                <li><label>Checkboxes restricting hyrocarbon extents</label></li>
+                <li><label>Make section wider by unchecking "Show Layer Names"</label></li>
+                <li><label>"Reset" to start over</label></li>
+            </ul>
+            <p>Have fun! <span style="font-size: 24px;">😊</span></p>
+        </div>
+    </div>
     <!--
        <p>Edit layers in TIME or DEPTH panels with mouse. +Ctrl for flat layers, +Shift+Ctrl moves whole layer.</p>
 
@@ -61,6 +90,9 @@
     <canvas id="canvasDepth"></canvas>
 
 
+
+
+
     <script type="module">
         import { changedHydrocarbon } from './script.js';
         import { changedCompartment } from './script.js';
@@ -71,9 +103,20 @@
 
         document.querySelector('.menu-icon').addEventListener('click', toggleMenu);
         document.querySelector('.reset-button').addEventListener('click', resetSection);
+
         // Add event listener to all checkboxes during initialization
         document.querySelectorAll('.sub-menu input').forEach(function (checkbox) {
             checkbox.addEventListener('change', checkboxChanged);
+        });
+
+        document.getElementById('help').addEventListener('click', function () {
+            // Show the help panel when the "Help" button is clicked
+            document.getElementById('helpPanel').style.display = 'block';
+            dismissMenu();
+        });
+        document.getElementById('closeHelp').addEventListener('click', function () {
+            // Close the help panel when the close button is clicked
+            document.getElementById('helpPanel').style.display = 'none';
         });
 
 

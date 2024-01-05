@@ -3,7 +3,7 @@ import { USection } from "./ZLoc.js";
 import { SEAWATER } from "./ZLoc.js";
 
 var LAYER_WIDTH = 200;
-var SMOOTH_WIN = 5;
+var SMOOTH_WIN = 7;
 var TAPER_WIN = 1;
 var uSection = null;
 
@@ -41,6 +41,7 @@ function init() {
   canvas.addEventListener("touchstart", startEditTIME);
   canvas.addEventListener("touchmove", moveEditTIME);
   canvas.addEventListener("touchend", endEdit);
+  canvas.addEventListener("touchend", touchEnd);
 
   canvas = document.getElementById("canvasDepth");
   canvas.addEventListener("mousedown", startEditDEPTH);
@@ -50,6 +51,7 @@ function init() {
   canvas.addEventListener("touchstart", startEditDEPTH);
   canvas.addEventListener("touchmove", moveEditDEPTH);
   canvas.addEventListener("touchend", endEdit);
+  canvas.addEventListener("touchend", touchEnd);
 
   // Prevent scrolling on touchscreen devices
   document.body.addEventListener(
@@ -177,6 +179,7 @@ export function changedHydrocarbon() {
   uSection.flattenContacts();
   uSection.ensureHChasThickness();
   uSection.update_TimeFromDepth(null);
+  uSection.autosetVerticalRanges();
   draw();
 }
 
@@ -186,7 +189,6 @@ function draw() {
 
   // movement??
   frame++;
-  showOut();
   window.requestAnimationFrame(draw);
 }
 
@@ -202,18 +204,15 @@ function startEditDEPTH(e) {
 
 function moveEditTIME(e) {
   moveEdit(Domain.DomTime, e);
-  showOut();
 }
 
 function moveEditDEPTH(e) {
   moveEdit(Domain.DomDepth, e);
-  showOut();
 }
 
 function mouseOut(e) {
   uSection.pointerDomain = Domain.None;
   uSection.setCursor(NaN, NaN, -1);
-  showOut();
 }
 
 function startEdit(domain, e) {
@@ -233,7 +232,7 @@ function startEdit(domain, e) {
 
   edited_i0 = edited_i1 = idx;
 
-  // rough convert if needed
+  // convert if needed
   if (
     editLayer != null &&
     editLayer.isContact &&
@@ -411,6 +410,7 @@ function moveEdit(domain, e) {
 }
 
 function endEdit(e) {
+  uSection.autosetVerticalRanges();
   editingDomain = Domain.None;
   editLayer = null;
   prevIdx = -1;
@@ -422,7 +422,9 @@ function endEdit(e) {
   wasWholeLayerShift = false;
 }
 
-function showOut() {}
+function touchEnd(e) {
+  mouseOut(e);
+}
 
 function smooth(zArray, win) {
   const n = zArray.length;
