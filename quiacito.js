@@ -2,8 +2,8 @@ export class ZLoc {
   constructor(time, depth) {
     this.time = time;
     this.depth = depth;
-    this.screenTime = 0;
-    this.screenDepth = 0;
+    this.screenTime = NaN;
+    this.screenDepth = NaN;
   }
 }
 
@@ -16,8 +16,6 @@ export const Domain = {
 export const SEAWATER = "Sea Water";
 
 const LEFT_SPACE = 80;
-const CANVAS_H = 400;
-
 const MINKT = 0.0001;
 const _ms2S = 0.001;
 const _mm2M = 0.001;
@@ -56,8 +54,8 @@ function DepthToTime(tA, dA, dB, v0, k, tml) {
   return tA + (2.0 * _s2Ms * (dB - dA)) / v0;
 }
 
-function initializeFloatArray(n) {
-  return new Array(n).fill(0.0);
+function initializeFloatArray(n, v) {
+  return new Array(n).fill(v);
 }
 
 function findClosestIndex(array, targetValue) {
@@ -94,8 +92,7 @@ export class Layer {
     this.contactControlDepth = initDepth;
     this.contactControlIndex = length / 2;
     this.color = color;
-    this.active = false;
-    this.visible = true;
+    this.active = true;
     this.isRestricted = false;
     this.length = length;
     this.point = Array.from({ length }, (_) => new ZLoc(initDepth, initDepth));
@@ -128,7 +125,7 @@ export class Layer {
   }
 
   convertToScreenY(domain, height, minZ, maxZ) {
-    let res = initializeFloatArray(this.length);
+    let res = initializeFloatArray(this.length, 0.0);
     for (let i = 0; i < this.length; i++) {
       var z = this.getZ(domain, i);
       var y = toScreenY(z, height, minZ, maxZ);
@@ -138,6 +135,13 @@ export class Layer {
     }
 
     return res;
+  }
+
+  clearToScreenY(domain) {
+    for (let i = 0; i < this.length; i++) {
+      if (domain == Domain.DomTime) this.point[i].screenTime = NaN;
+      else this.point[i].screenDepth = NaN;
+    }
   }
 
   setToConstant(domain, value) {
@@ -214,6 +218,7 @@ export class USection {
     this.pointerVelocity = NaN;
     this.pointerDomain = Domain.None;
     this.showLayerNames = true;
+    this.showHC = true;
 
     this.taper = new Array(1).fill(0.0);
   }
@@ -233,8 +238,8 @@ export class USection {
   }
 
   overwriteLayer(layer, domain, inputZ) {
-    let layerA = this.getVisibleRegularLayerAbove(layer);
-    let layerB = this.getVisibleRegularLayerBelow(layer);
+    let layerA = this.getActiveRegularLayerAbove(layer);
+    let layerB = this.getActiveRegularLayerBelow(layer);
     if (layer == this.mudlineLayer && domain == Domain.DomDepth) {
       for (let i = 0; i < layer.length; i++)
         layer.setZ(domain, i, inputZ[i], null, layerB);
@@ -250,8 +255,8 @@ export class USection {
   overwriteLayerRange(layer, domain, inputZ, i0, i1, taperW) {
     if (this.taper.length != taperW) this.taper = this.calcTaper(taperW);
 
-    let layerA = this.getVisibleLayerAbove(layer);
-    let layerB = this.getVisibleLayerBelow(layer);
+    let layerA = this.getActiveLayerAbove(layer);
+    let layerB = this.getActiveLayerBelow(layer);
     // values in edit range
     for (let i = i0; i <= i1; i++) layer.setZ(domain, i, inputZ[i]);
 
@@ -327,28 +332,49 @@ export class USection {
     this.maxTime += dz;
   }
 
-  setLayerVisible(layerName, viz) {
+  setLayerActive(layerName, activ) {
     this.layers.forEach((layer) => {
       if (layer.name == layerName) {
-        layer.visible = viz;
+        layer.active = activ;
         return;
       }
     });
+  }
+
+  toggleLayerActive(layerName) {
+    var state = false;
+    this.layers.forEach((layer) => {
+      if (layer.name == layerName) {
+        layer.active = !layer.active;
+        state = layer.active;
+      }
+    });
+    return state;
   }
 
   setCompartmentRestriction(layerName, isRestricted) {
     this.layers.forEach((layer) => {
       if (layer.name == layerName) {
         layer.isRestricted = isRestricted;
-        return;
       }
     });
   }
 
+  toggleCompartmentRestriction(layerName) {
+    var state = false;
+    this.layers.forEach((layer) => {
+      if (layer.name == layerName) {
+        layer.isRestricted = !layer.isRestricted;
+        state = layer.isRestricted;
+      }
+    });
+    return state;
+  }
+
   ensureHChasThickness() {
     var anyZeroThicknessHC = false;
-    this.visibleContactLayers.forEach((layer) => {
-      var layerA = this.getVisibleLayerAbove(layer);
+    this.activeContactLayers.forEach((layer) => {
+      var layerA = this.getActiveLayerAbove(layer);
       if (layerA != null && !layer.isAnyDeeperThan(layerA))
         anyZeroThicknessHC = true;
     });
@@ -361,8 +387,8 @@ export class USection {
     while (adjusted) {
       adjusted = false;
 
-      this.visibleContactLayers.forEach((layer) => {
-        var layerA = this.getVisibleLayerAbove(layer);
+      this.activeContactLayers.forEach((layer) => {
+        var layerA = this.getActiveLayerAbove(layer);
         var maxThick = layer.maximumThicknessBetween(layerA);
 
         // move all that have thin thickess downward
@@ -381,18 +407,18 @@ export class USection {
     }
   }
 
-  get visibleLayers() {
-    return this.layers.filter((item) => item.visible === true);
+  get activeLayers() {
+    return this.layers.filter((item) => item.active === true);
   }
 
-  get visibleRegularLayers() {
+  get activeRegularLayers() {
     return this.layers.filter(
-      (item) => item.visible === true && item.isContact == false
+      (item) => item.active === true && item.isContact == false
     );
   }
-  get visibleContactLayers() {
+  get activeContactLayers() {
     return this.layers.filter(
-      (item) => item.visible === true && item.isContact == true
+      (item) => item.active === true && item.isContact == true
     );
   }
 
@@ -403,46 +429,46 @@ export class USection {
     return this.layers[0];
   }
 
-  getVisibleRegularLayerAbove(layer) {
+  getActiveRegularLayerAbove(layer) {
     if (layer == null) return null;
     var idx = this.layers.indexOf(layer);
     if (idx == -1) return null;
 
     for (let i = idx - 1; i >= 0; i--) {
-      if (this.layers[i].isContact == false && this.layers[i].visible)
+      if (this.layers[i].isContact == false && this.layers[i].active)
         return this.layers[i];
     }
     return null;
   }
 
-  getVisibleRegularLayerBelow(layer) {
+  getActiveRegularLayerBelow(layer) {
     if (layer == null) return null;
     var idx = this.layers.indexOf(layer);
     if (idx == -1) return null;
     for (let i = idx + 1; i < this.layers.length; i++) {
-      if (this.layers[i].isContact == false && this.layers[i].visible)
+      if (this.layers[i].isContact == false && this.layers[i].active)
         return this.layers[i];
     }
     return null;
   }
 
-  getVisibleLayerAbove(layer) {
+  getActiveLayerAbove(layer) {
     if (layer == null) return null;
     var idx = this.layers.indexOf(layer);
     if (idx == -1) return null;
 
     for (let i = idx - 1; i >= 0; i--) {
-      if (this.layers[i].visible) return this.layers[i];
+      if (this.layers[i].active) return this.layers[i];
     }
     return null;
   }
 
-  getVisibleLayerBelow(layer) {
+  getActiveLayerBelow(layer) {
     if (layer == null) return null;
     var idx = this.layers.indexOf(layer);
     if (idx == -1) return null;
     for (let i = idx + 1; i < this.layers.length; i++) {
-      if (this.layers[i].visible) return this.layers[i];
+      if (this.layers[i].active) return this.layers[i];
     }
     return null;
   }
@@ -451,8 +477,8 @@ export class USection {
     layer.contactControlDepth = rZ;
     layer.contactControlIndex = idx;
 
-    let layerA = this.getVisibleLayerAbove(layer);
-    let layerB = this.getVisibleLayerBelow(layer);
+    let layerA = this.getActiveLayerAbove(layer);
+    let layerB = this.getActiveLayerBelow(layer);
 
     // depth limit contact
     for (let i = 0; i < layer.length; i++) {
@@ -461,8 +487,8 @@ export class USection {
       layer.point[i].depth = clamp(rZ, minZ, maxZ);
     }
 
-    layerA = this.getVisibleRegularLayerAbove(layer);
-    layerB = this.getVisibleRegularLayerBelow(layer);
+    layerA = this.getActiveRegularLayerAbove(layer);
+    layerB = this.getActiveRegularLayerBelow(layer);
     for (let i = 0; i < layer.length; i++) {
       var minZ = layerA.point[i].depth;
       var maxZ =
@@ -473,7 +499,7 @@ export class USection {
     // then restrict compartment? [option?]
     var restrictCompartment = layer.isRestricted;
     if (restrictCompartment) {
-      layerA = this.getVisibleRegularLayerAbove(layer);
+      layerA = this.getActiveRegularLayerAbove(layer);
       if (layer.point[idx].depth > layerA.point[idx].depth) {
         // find extent
         var compartmentIdxA = 0;
@@ -502,7 +528,7 @@ export class USection {
 
   flattenContacts() {
     this.layers.forEach((layer) => {
-      if (layer.isContact && layer.visible) {
+      if (layer.isContact && layer.active) {
         this.adjustContactDepth(
           layer,
           layer.contactControlDepth,
@@ -520,8 +546,8 @@ export class USection {
 
   debug(title) {
     console.log(title);
-    for (let j = 0; j < this.visibleLayers.length; j++) {
-      let layer = this.visibleLayers[j];
+    for (let j = 0; j < this.activeLayers.length; j++) {
+      let layer = this.activeLayers[j];
 
       console.log(
         layer.name + " " + layer.point[0].time + ", " + layer.point[0].depth
@@ -532,9 +558,9 @@ export class USection {
   update_TimeFromDepth(finalLayer) {
     this.setupVelocityLayers();
     // ensure contacts increasing
-    for (let i = 1; i < this.visibleContactLayers.length; i++) {
-      var cntA = this.visibleContactLayers[i - 1];
-      var cntB = this.visibleContactLayers[i];
+    for (let i = 1; i < this.activeContactLayers.length; i++) {
+      var cntA = this.activeContactLayers[i - 1];
+      var cntB = this.activeContactLayers[i];
       if (cntB.contactControlDepth <= cntA.contactControlDepth)
         cntB.contactControlDepth = cntA.contactControlDepth + 50;
     }
@@ -557,9 +583,9 @@ export class USection {
       else this.mudlineLayer.point[i].time = 0.0; // it's at surface, elevated
     }
     // the rest..
-    for (let j = 2; j < this.visibleLayers.length; j++) {
-      let layerA = this.visibleLayers[j - 1];
-      let layerB = this.visibleLayers[j];
+    for (let j = 2; j < this.activeLayers.length; j++) {
+      let layerA = this.activeLayers[j - 1];
+      let layerB = this.activeLayers[j];
 
       for (let i = 0; i < this.length; i++) {
         let ptA = layerA.point[i];
@@ -594,9 +620,9 @@ export class USection {
     }
 
     // the rest..
-    for (let j = 2; j < this.visibleLayers.length; j++) {
-      let layerA = this.visibleLayers[j - 1];
-      let layerB = this.visibleLayers[j];
+    for (let j = 2; j < this.activeLayers.length; j++) {
+      let layerA = this.activeLayers[j - 1];
+      let layerB = this.activeLayers[j];
 
       for (let i = 0; i < this.length; i++) {
         let ptA = layerA.point[i];
@@ -617,7 +643,7 @@ export class USection {
   }
 
   setupVelocityLayers() {
-    var vizLayers = this.visibleLayers;
+    var vizLayers = this.activeLayers;
 
     // stage1: set to self
     vizLayers.forEach((layer) => {
@@ -637,7 +663,7 @@ export class USection {
   }
 
   setupQuickTimeToDepth(layer) {
-    this.quik_layer = this.getVisibleLayerAbove(layer);
+    this.quik_layer = this.getActiveLayerAbove(layer);
   }
 
   quickConvert(t1, idx) {
@@ -656,7 +682,7 @@ export class USection {
     // get the layer pointer is in
     if (idx < 0) return NaN;
     if (idx >= this.length) return NaN;
-    var vizLayers = this.visibleLayers;
+    var vizLayers = this.activeLayers;
     for (let i = vizLayers.length - 1; i >= 0; i--) {
       var layerA = vizLayers[i];
       if (depth >= layerA.point[idx].depth) {
@@ -684,7 +710,7 @@ export class USection {
     // get the layer pointer is in
     if (idx < 0) return NaN;
     if (idx >= this.length) return NaN;
-    var vizLayers = this.visibleLayers;
+    var vizLayers = this.activeLayers;
     for (let i = vizLayers.length - 1; i >= 0; i--) {
       var layerA = vizLayers[i];
       if (time >= layerA.point[idx].time) {
@@ -712,7 +738,7 @@ export class USection {
     // get the layer pointer is in
     if (idx < 0) return NaN;
     if (idx >= this.length) return NaN;
-    var vizLayers = this.visibleLayers;
+    var vizLayers = this.activeLayers;
 
     for (let i = vizLayers.length - 1; i >= 0; i--) {
       var layerA = vizLayers[i];
@@ -778,28 +804,18 @@ export class USection {
     }
 
     // layers
-    this.visibleLayers.forEach((layer) => {
+    this.activeLayers.forEach((layer) => {
+      var fill = this.showHC || !layer.isContact;
+      var line = this.showHC || !layer.isContact;
       layer.yValues = layer.convertToScreenY(domain, h, minZ, maxZ);
       this.plotSurface(
         ctx,
         this.xValues,
         layer.yValues,
         "dimgray",
-        layer.velocityLayer.color,
-        false,
-        true
-      );
-    });
-
-    this.visibleLayers.forEach((layer) => {
-      this.plotSurface(
-        ctx,
-        this.xValues,
-        layer.yValues,
-        "dimgray",
-        layer.velocityLayer.color,
-        true,
-        false
+        this.showHC ? layer.velocityLayer.color : layer.color,
+        fill,
+        line
       );
     });
 
@@ -831,12 +847,12 @@ export class USection {
     ctx.textBaseline = "middle";
     ctx.fillStyle = "black";
 
-    var n = this.visibleRegularLayers.length;
+    var n = this.activeRegularLayers.length;
     for (let index = 0; index < n; index++) {
-      const layerA = this.visibleRegularLayers[index];
+      const layerA = this.activeRegularLayers[index];
       const aY = layerA.yValues[0];
       const bY =
-        index + 1 < n ? this.visibleRegularLayers[index + 1].yValues[0] : h;
+        index + 1 < n ? this.activeRegularLayers[index + 1].yValues[0] : h;
       ctx.fillText(layerA.name, this.x0 - 5, (aY + bY) / 2);
     }
 
@@ -994,7 +1010,7 @@ export class USection {
     let i = -1;
 
     // first select regular if you can
-    this.visibleRegularLayers.forEach((layer) => {
+    this.activeRegularLayers.forEach((layer) => {
       i++;
       if (layer != this.waterLayer) {
         let sy =
@@ -1012,21 +1028,24 @@ export class USection {
     if (closeLayer != null) return closeLayer;
 
     // then contact layers
-    minDiff = Number.MAX_VALUE;
-    closeLayer = null;
-    i = -1;
-    this.visibleContactLayers.forEach((layer) => {
-      i++;
-      let sy =
-        domain == Domain.DomDepth
-          ? layer.point[idx].screenDepth
-          : layer.point[idx].screenTime;
-      let diff = Math.abs(sy - y);
-      if (diff < PIX && diff < minDiff) {
-        minDiff = diff;
-        closeLayer = layer;
-      }
-    });
+    // only if showHC is true!
+    if (this.showHC) {
+      minDiff = Number.MAX_VALUE;
+      closeLayer = null;
+      i = -1;
+      this.activeContactLayers.forEach((layer) => {
+        i++;
+        let sy =
+          domain == Domain.DomDepth
+            ? layer.point[idx].screenDepth
+            : layer.point[idx].screenTime;
+        let diff = Math.abs(sy - y);
+        if (diff < PIX && diff < minDiff) {
+          minDiff = diff;
+          closeLayer = layer;
+        }
+      });
+    }
 
     return closeLayer;
   }

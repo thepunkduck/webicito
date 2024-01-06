@@ -72,6 +72,54 @@ function init() {
   window.requestAnimationFrame(draw);
   window.addEventListener("resize", resizeCanvas, false);
 
+  // Event for 'h' key press
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "h") {
+      uSection.showHC = !uSection.showHC;
+      document.getElementById("showHC").checked = uSection.showHC;
+    }
+    if (event.key === "l") {
+      uSection.showLayerNames = !uSection.showLayerNames;
+      document.getElementById("layerNames").checked = uSection.showLayerNames;
+    }
+
+    if (event.key === "1") {
+      document.getElementById("gasA").checked =
+        uSection.toggleLayerActive("GasA");
+      checkboxChanged();
+    }
+    if (event.key === "2") {
+      document.getElementById("oilA").checked =
+        uSection.toggleLayerActive("OilA");
+      checkboxChanged();
+    }
+    if (event.key === "3") {
+      document.getElementById("resA").checked =
+        uSection.toggleCompartmentRestriction("GasA");
+      document.getElementById("resA").checked =
+        uSection.toggleCompartmentRestriction("OilA");
+      checkboxChanged();
+    }
+
+    if (event.key === "4") {
+      document.getElementById("gasB").checked =
+        uSection.toggleLayerActive("GasB");
+      checkboxChanged();
+    }
+    if (event.key === "5") {
+      document.getElementById("oilB").checked =
+        uSection.toggleLayerActive("OilB");
+      checkboxChanged();
+    }
+    if (event.key === "6") {
+      document.getElementById("resB").checked =
+        uSection.toggleCompartmentRestriction("GasB");
+      document.getElementById("resB").checked =
+        uSection.toggleCompartmentRestriction("OilB");
+      checkboxChanged();
+    }
+  });
+
   resetSection();
 }
 
@@ -104,6 +152,7 @@ export function resetSection() {
   canvas = document.getElementById("canvasDepth");
   uSection.canvasDepth = canvas;
   uSection.showLayerNames = last_showLayerNames;
+  uSection.showHC = true;
 
   document.getElementById("gasA").checked = false;
   document.getElementById("gasB").checked = false;
@@ -112,6 +161,7 @@ export function resetSection() {
   document.getElementById("resA").checked = false;
   document.getElementById("resB").checked = false;
   document.getElementById("layerNames").checked = uSection.showLayerNames;
+  document.getElementById("showHC").checked = uSection.showHC;
 
   changedHydrocarbon();
   uSection.update_TimeFromDepth(null);
@@ -163,11 +213,12 @@ export function changedHydrocarbon() {
   var resA = document.getElementById("resA").checked;
   var resB = document.getElementById("resB").checked;
   var layerNames = document.getElementById("layerNames").checked;
+  var showHC = document.getElementById("showHC").checked;
 
-  uSection.setLayerVisible("OilA", oilA);
-  uSection.setLayerVisible("OilB", oilB);
-  uSection.setLayerVisible("GasA", gasA);
-  uSection.setLayerVisible("GasB", gasB);
+  uSection.setLayerActive("OilA", oilA);
+  uSection.setLayerActive("OilB", oilB);
+  uSection.setLayerActive("GasA", gasA);
+  uSection.setLayerActive("GasB", gasB);
 
   uSection.setCompartmentRestriction("OilA", resA);
   uSection.setCompartmentRestriction("OilB", resB);
@@ -175,6 +226,7 @@ export function changedHydrocarbon() {
   uSection.setCompartmentRestriction("GasB", resB);
 
   uSection.showLayerNames = layerNames;
+  uSection.showHC = showHC;
 
   uSection.flattenContacts();
   uSection.ensureHChasThickness();
@@ -288,8 +340,8 @@ function moveEdit(domain, e) {
 
   if (editingDomain == domain) {
     if (editLayer != null) {
-      var layerA = uSection.getVisibleRegularLayerAbove(editLayer);
-      var layerB = uSection.getVisibleRegularLayerBelow(editLayer);
+      var layerA = uSection.getActiveRegularLayerAbove(editLayer);
+      var layerB = uSection.getActiveRegularLayerBelow(editLayer);
 
       if (editLayer.isContact) {
         if (editingDomain == Domain.DomDepth)
@@ -299,7 +351,7 @@ function moveEdit(domain, e) {
           var roughDepth = uSection.quickConvert(rZ, idx);
           uSection.adjustContactDepth(editLayer, roughDepth, idx, false);
           uSection.update_TimeFromDepth(editLayer);
-          var vizBelow = uSection.getVisibleLayerBelow(editLayer);
+          var vizBelow = uSection.getActiveLayerBelow(editLayer);
           // restrict editlayer in TIME. Times below unaffected
           if (vizBelow != null)
             for (let i = 0; i < uSection.length; i++)
