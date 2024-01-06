@@ -95,6 +95,7 @@ p {
   position: absolute;
   top: 40px;
   left: -240px;
+  width: 240px;
   padding: 0px;
   margin: 0;
   background-color: #eee;
@@ -105,6 +106,7 @@ p {
 }
 
 .menu-list li {
+  margin-top: 5px;
   margin-left: 5px;
   margin-right: 10px;
   margin-bottom: 5px;
