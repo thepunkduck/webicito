@@ -54,8 +54,8 @@ function DepthToTime(tA, dA, dB, v0, k, tml) {
   return tA + (2.0 * _s2Ms * (dB - dA)) / v0;
 }
 
-function initializeFloatArray(n, v) {
-  return new Array(n).fill(v);
+function createFloatArray(n) {
+  return new Array(n).fill(0.0);
 }
 
 function findClosestIndex(array, targetValue) {
@@ -91,6 +91,7 @@ export class Layer {
     this.isContact = isContact;
     this.contactControlDepth = initDepth;
     this.contactControlIndex = length / 2;
+    this.contactControlTime = NaN;
     this.color = color;
     this.active = true;
     this.isRestricted = false;
@@ -125,7 +126,7 @@ export class Layer {
   }
 
   convertToScreenY(domain, height, minZ, maxZ) {
-    let res = initializeFloatArray(this.length, 0.0);
+    let res = createFloatArray(this.length);
     for (let i = 0; i < this.length; i++) {
       var z = this.getZ(domain, i);
       var y = toScreenY(z, height, minZ, maxZ);
@@ -137,13 +138,6 @@ export class Layer {
     return res;
   }
 
-  clearToScreenY(domain) {
-    for (let i = 0; i < this.length; i++) {
-      if (domain == Domain.DomTime) this.point[i].screenTime = NaN;
-      else this.point[i].screenDepth = NaN;
-    }
-  }
-
   setToConstant(domain, value) {
     for (let i = 0; i < this.length; i++) {
       this.setZ(domain, i, value);
@@ -152,7 +146,7 @@ export class Layer {
 
   snapShot(domain) {
     const n = this.length;
-    const z = new Array(n).fill(0.0);
+    const z = createFloatArray(n);
     for (let i = 0; i < n; i++) z[i] = this.getZ(domain, i);
     return z;
   }
@@ -202,15 +196,13 @@ export class USection {
     this.maxDepth = 4000.0;
     this.minTime = -100.0;
     this.maxTime = 4000.0;
-    this.xValues = new Array(length).fill(0.0);
+    this.xValues = createFloatArray(length);
     this.canvasDepth = null;
     this.canvasTime = null;
     this.length = length;
 
     this.x0 = LEFT_SPACE;
     this.y0 = 0;
-
-    this.quik_layer = null;
 
     this.pointerIndex = -1;
     this.pointerDepth = NaN;
@@ -220,7 +212,7 @@ export class USection {
     this.showLayerNames = true;
     this.showHC = true;
 
-    this.taper = new Array(1).fill(0.0);
+    this.taper = createFloatArray(1);
   }
 
   addLayer(name, color, v0, k, isContact, initDepth) {
@@ -240,6 +232,7 @@ export class USection {
   overwriteLayer(layer, domain, inputZ) {
     let layerA = this.getActiveRegularLayerAbove(layer);
     let layerB = this.getActiveRegularLayerBelow(layer);
+
     if (layer == this.mudlineLayer && domain == Domain.DomDepth) {
       for (let i = 0; i < layer.length; i++)
         layer.setZ(domain, i, inputZ[i], null, layerB);
@@ -252,41 +245,89 @@ export class USection {
     }
   }
 
-  overwriteLayerRange(layer, domain, inputZ, i0, i1, taperW) {
+  overwriteLayerRange(layer, domain, inputZ, i0, i1, smoothW, taperW) {
     if (this.taper.length != taperW) this.taper = this.calcTaper(taperW);
 
-    let layerA = this.getActiveLayerAbove(layer);
-    let layerB = this.getActiveLayerBelow(layer);
-    // values in edit range
-    for (let i = i0; i <= i1; i++) layer.setZ(domain, i, inputZ[i]);
+    // clamping layers
+    let layerA = this.getActiveRegularLayerAbove(layer);
+    if (domain == Domain.DomDepth && layerA == this.waterLayer) layerA = null;
+    let layerB = this.getActiveRegularLayerBelow(layer);
+
+    // make copy of layer z
+    var wholeZ = layer.snapShot(domain);
+    var minZ = 0.0;
+    var maxZ = 0.0;
+    // overwrite values in edit range
+    for (let i = i0; i <= i1; i++) {
+      minZ = layerA != null ? layerA.getZ(domain, i) : -Number.MAX_VALUE;
+      maxZ = layerB != null ? layerB.getZ(domain, i) : Number.MAX_VALUE;
+      wholeZ[i] = clamp(inputZ[i], minZ, maxZ);
+    }
 
     // tapering
     for (let i = 1; i < taperW; i++) {
       var f = this.taper[i];
       var ia = i1 + i;
-      if (ia < this.length)
-        layer.setZ(
-          domain,
-          ia,
-          f * layer.getZ(domain, ia) + (1 - f) * inputZ[ia],
-          layerA,
-          layerB
-        );
+      if (ia < this.length) {
+        minZ = layerA != null ? layerA.getZ(domain, ia) : -Number.MAX_VALUE;
+        maxZ = layerB != null ? layerB.getZ(domain, ia) : Number.MAX_VALUE;
+        wholeZ[ia] = clamp(f * wholeZ[ia] + (1 - f) * inputZ[ia], minZ, maxZ);
+      }
 
       ia = i0 - i;
-      if (ia >= 0)
-        layer.setZ(
-          domain,
-          ia,
-          f * layer.getZ(domain, ia) + (1 - f) * inputZ[ia],
-          layerA,
-          layerB
-        );
+      if (ia >= 0) {
+        minZ = layerA != null ? layerA.getZ(domain, ia) : -Number.MAX_VALUE;
+        maxZ = layerB != null ? layerB.getZ(domain, ia) : Number.MAX_VALUE;
+        wholeZ[ia] = clamp(f * wholeZ[ia] + (1 - f) * inputZ[ia], minZ, maxZ);
+      }
+    }
+
+    // then smooth
+    var smoothZ = this.smooth(wholeZ, smoothW);
+
+    // clamp again to make sure
+    for (let i = i0; i <= i1; i++) {
+      minZ = layerA != null ? layerA.getZ(domain, i) : -Number.MAX_VALUE;
+      maxZ = layerB != null ? layerB.getZ(domain, i) : Number.MAX_VALUE;
+      smoothZ[i] = clamp(smoothZ[i], minZ, maxZ);
+    }
+
+    // set taper-extended range
+    i0 -= taperW;
+    if (i0 < 0) i0 = 0;
+    i1 += taperW;
+    if (i1 >= layer.length) i1 = layer.length - 1;
+
+    for (let i = i0; i <= i1; i++) {
+      // if unsmoothed limited by regular layers - stick to that
+      // otherwise use the smooothed
+      // prevents smoothing introducing tiny slivers
+      minZ = layerA != null ? layerA.getZ(domain, i) : -Number.MAX_VALUE;
+      maxZ = layerB != null ? layerB.getZ(domain, i) : Number.MAX_VALUE;
+      if (wholeZ[i] == minZ || wholeZ[i] == maxZ)
+        layer.setZ(domain, i, wholeZ[i]);
+      else layer.setZ(domain, i, smoothZ[i]);
     }
   }
 
+  smooth(zArray, win) {
+    const n = zArray.length;
+    var smoothed = createFloatArray(n);
+    const hwin = Math.floor(win / 2);
+    for (let j = 0; j < win; j++) {
+      var offset = j - hwin;
+      for (let i = 0; i < n; i++) {
+        var ia = i + offset;
+        if (ia < 0) ia = 0;
+        if (ia >= n) ia = n - 1;
+        smoothed[i] += zArray[ia] / win;
+      }
+    }
+    return smoothed;
+  }
+
   calcTaper(taperW) {
-    const fs = new Array(taperW).fill(0.0);
+    const fs = createFloatArray(taperW);
     const k = 6;
     const A0 = 1 / (1 + Math.exp(-k * (0 - 0.5)));
     const A1 = 1 / (1 + Math.exp(-k * (1 - 0.5)));
@@ -402,7 +443,7 @@ export class USection {
       if (adjusted) {
         // flatten out again
         // flatten and test again...
-        this.flattenContacts();
+        this.flattenContactsInDepth();
       }
     }
   }
@@ -526,22 +567,25 @@ export class USection {
     }
   }
 
-  flattenContacts() {
-    this.layers.forEach((layer) => {
-      if (layer.isContact && layer.active) {
-        this.adjustContactDepth(
-          layer,
-          layer.contactControlDepth,
-          layer.contactControlIndex,
-          true
-        );
-      }
+  flattenContactsInDepth() {
+    this.activeContactLayers.forEach((layer) => {
+      layer.contactControlDepth = Math.max(
+        layer.contactControlDepth,
+        layer.point[layer.contactControlIndex].depth
+      );
+
+      this.adjustContactDepth(
+        layer,
+        layer.contactControlDepth,
+        layer.contactControlIndex,
+        true
+      );
     });
   }
 
   update_From(domain) {
-    if (domain == Domain.DomDepth) this.update_TimeFromDepth(null);
-    else this.update_DepthFromTime(null);
+    if (domain == Domain.DomDepth) this.update_TimeFromDepth();
+    else this.update_DepthFromTime();
   }
 
   debug(title) {
@@ -555,7 +599,8 @@ export class USection {
     }
   }
 
-  update_TimeFromDepth(finalLayer) {
+  update_TimeFromDepth() {
+    this.flattenContactsInDepth();
     this.setupVelocityLayers();
     // ensure contacts increasing
     for (let i = 1; i < this.activeContactLayers.length; i++) {
@@ -600,15 +645,28 @@ export class USection {
           ptML.time
         );
       }
-
-      if (finalLayer == layerB) return;
     }
+
+    // contact control points
+    this.activeContactLayers.forEach((layer) => {
+      if (
+        layer.contactControlDepth < layer.point[layer.contactControlIndex].depth
+      )
+        layer.contactControlDepth =
+          layer.point[layer.contactControlIndex].depth;
+
+      layer.contactControlTime = this.convertDepthToTime(
+        layer.contactControlDepth,
+        layer.contactControlIndex
+      );
+    });
   }
 
-  update_DepthFromTime(finalLayer) {
+  update_DepthFromTime() {
     this.setupVelocityLayers();
 
-    // water at zero always
+    // water at zero always when converting time to depth
+    // (depth to time permits elevation)
     this.waterLayer.setToConstant(Domain.DomDepth, 0);
     this.waterLayer.setToConstant(Domain.DomTime, 0);
 
@@ -624,36 +682,128 @@ export class USection {
       let layerA = this.activeLayers[j - 1];
       let layerB = this.activeLayers[j];
 
-      for (let i = 0; i < this.length; i++) {
-        let ptA = layerA.point[i];
-        let ptB = layerB.point[i];
-        let ptML = this.mudlineLayer.point[i];
-        ptB.depth = TimeToDepth(
+      // depth convert down to this layer:
+      // regular: just convert
+      if (layerB.isContact == false) {
+        // REGULAR
+        for (let i = 0; i < this.length; i++) {
+          let ptA = layerA.point[i];
+          let ptB = layerB.point[i];
+          let ptML = this.mudlineLayer.point[i];
+          ptB.depth = TimeToDepth(
+            ptA.depth,
+            ptA.time,
+            ptB.time,
+            layerA.velocityLayer.v0,
+            layerA.velocityLayer.k,
+            ptML.time
+          );
+        }
+      } else {
+        // CONTACT
+        // Here, we attempt to keep the contact layers at set time value
+        // (a) if control point (time) < layer, correct it
+        layerB.contactControlTime = Math.max(
+          layerB.contactControlTime,
+          layerA.point[layerB.contactControlIndex].time
+        );
+        // (b) convert control points time -> depth
+        let ptA = layerA.point[layerB.contactControlIndex];
+        let ptML = this.mudlineLayer.point[layerB.contactControlIndex];
+        let contactDepth = TimeToDepth(
           ptA.depth,
           ptA.time,
-          ptB.time,
+          layerB.contactControlTime,
           layerA.velocityLayer.v0,
           layerA.velocityLayer.k,
           ptML.time
         );
-      }
+        layerB.contactControlDepth = contactDepth;
 
-      if (finalLayer == layerB) return;
+        const layerRegA = this.getActiveRegularLayerAbove(layerB);
+        const layerRegB = this.getActiveRegularLayerBelow(layerB);
+        for (let i = 0; i < this.length; i++) {
+          ptA = layerA.point[i];
+          let ptB = layerB.point[i];
+          let ptRA = layerRegA.point[i];
+          let ptRB = layerRegB != null ? layerRegB.point[i] : null;
+          // (c) calculate contact/flat layer in depth,
+          ptB.depth = contactDepth;
+          // (d) truncate to upper regular's depth
+          if (ptB.depth < ptRA.depth) ptB.depth = ptRA.depth;
+          // (e) convert contact/flat to time
+          ptB.time = DepthToTime(
+            ptA.time,
+            ptA.depth,
+            ptB.depth,
+            layerA.velocityLayer.v0,
+            layerA.velocityLayer.k,
+            ptML.time
+          );
+          // (f) truncate in time domain by lower regular
+          ptB.time = Math.min(ptB.time, ptRB.time);
+        }
+
+        // (g) if control point unconnected to fill, move to nearest fill??
+        // (h) restrict to compartment?
+        var restrictCompartment = layerB.isRestricted;
+        if (restrictCompartment) {
+          const idx = layerB.contactControlIndex;
+          if (layerB.point[idx].time > layerRegA.point[idx].time) {
+            // find extent
+            var compartmentIdxA = 0;
+            for (let i = idx; i >= 0; i--) {
+              if (layerB.point[i].time <= layerRegA.point[i].time) {
+                compartmentIdxA = i;
+                break;
+              }
+            }
+
+            var compartmentIdxB = layerB.length - 1;
+            for (let i = idx; i < layerB.length; i++) {
+              if (layerB.point[i].time <= layerRegA.point[i].time) {
+                compartmentIdxB = i;
+                break;
+              }
+            }
+
+            for (let i = 0; i < layerB.length; i++) {
+              if (i < compartmentIdxA || i > compartmentIdxB)
+                layerB.point[i].time = layerRegA.point[i].time;
+            }
+          }
+        }
+
+        // (i) finally time to depth!
+        for (let i = 0; i < this.length; i++) {
+          let ptA = layerA.point[i];
+          let ptB = layerB.point[i];
+          let ptML = this.mudlineLayer.point[i];
+          ptB.depth = TimeToDepth(
+            ptA.depth,
+            ptA.time,
+            ptB.time,
+            layerA.velocityLayer.v0,
+            layerA.velocityLayer.k,
+            ptML.time
+          );
+        }
+      } // END CONTACT
     }
   }
 
   setupVelocityLayers() {
-    var vizLayers = this.activeLayers;
+    var actLayers = this.activeLayers;
 
     // stage1: set to self
-    vizLayers.forEach((layer) => {
+    actLayers.forEach((layer) => {
       layer.velocityLayer = layer;
     });
 
     // stage 2: find contacts, and swap *velocity* with layer above
-    for (let i = 1; i < vizLayers.length; i++) {
-      let layerA = vizLayers[i - 1];
-      let layerB = vizLayers[i];
+    for (let i = 1; i < actLayers.length; i++) {
+      let layerA = actLayers[i - 1];
+      let layerB = actLayers[i];
       if (layerB.isContact) {
         var c = layerA.velocityLayer;
         layerA.velocityLayer = layerB.velocityLayer;
@@ -662,29 +812,13 @@ export class USection {
     }
   }
 
-  setupQuickTimeToDepth(layer) {
-    this.quik_layer = this.getActiveLayerAbove(layer);
-  }
-
-  quickConvert(t1, idx) {
-    var d1 = TimeToDepth(
-      this.quik_layer.point[idx].depth,
-      this.quik_layer.point[idx].time,
-      t1,
-      this.quik_layer.velocityLayer.v0,
-      this.quik_layer.velocityLayer.k,
-      this.layers[1].point[idx].time
-    );
-    return d1;
-  }
-
   convertDepthToTime(depth, idx) {
     // get the layer pointer is in
     if (idx < 0) return NaN;
     if (idx >= this.length) return NaN;
-    var vizLayers = this.activeLayers;
-    for (let i = vizLayers.length - 1; i >= 0; i--) {
-      var layerA = vizLayers[i];
+    var actLayers = this.activeLayers;
+    for (let i = actLayers.length - 1; i >= 0; i--) {
+      var layerA = actLayers[i];
       if (depth >= layerA.point[idx].depth) {
         // therefore tA, dA above pointer
         var tA = layerA.point[idx].time;
@@ -706,13 +840,15 @@ export class USection {
     return NaN;
   }
 
+  // all layers
+  // times/depths/v0/k/velocityLater
   convertTimeToDepth(time, idx) {
     // get the layer pointer is in
     if (idx < 0) return NaN;
     if (idx >= this.length) return NaN;
-    var vizLayers = this.activeLayers;
-    for (let i = vizLayers.length - 1; i >= 0; i--) {
-      var layerA = vizLayers[i];
+    var layers = this.activeLayers;
+    for (let i = layers.length - 1; i >= 0; i--) {
+      var layerA = layers[i];
       if (time >= layerA.point[idx].time) {
         // therefore tA, dA above pointer
         var tA = layerA.point[idx].time;
@@ -738,10 +874,10 @@ export class USection {
     // get the layer pointer is in
     if (idx < 0) return NaN;
     if (idx >= this.length) return NaN;
-    var vizLayers = this.activeLayers;
+    var actLayers = this.activeLayers;
 
-    for (let i = vizLayers.length - 1; i >= 0; i--) {
-      var layerA = vizLayers[i];
+    for (let i = actLayers.length - 1; i >= 0; i--) {
+      var layerA = actLayers[i];
       if (depth >= layerA.point[idx].depth) {
         let ptML = this.mudlineLayer.point[idx];
 
@@ -784,8 +920,8 @@ export class USection {
     ctx.save();
 
     this.x0 = this.showLayerNames ? LEFT_SPACE : 0;
-    var w = canvas.width - this.x0;
-    var h = canvas.height;
+    var width = canvas.width - this.x0;
+    var height = canvas.height;
     // get the vertical range for this domain
     var minZ = 0;
     var maxZ = 100;
@@ -799,34 +935,67 @@ export class USection {
 
     // draw, fill layers
     for (let i = 0; i < this.length; i++) {
-      let x = this.toScreenX(i, w);
+      let x = this.toScreenX(i, width);
       this.xValues[i] = x;
     }
 
     // layers
+    // fills
     this.activeLayers.forEach((layer) => {
       var fill = this.showHC || !layer.isContact;
-      var line = this.showHC || !layer.isContact;
-      layer.yValues = layer.convertToScreenY(domain, h, minZ, maxZ);
+      layer.yValues = layer.convertToScreenY(domain, height, minZ, maxZ);
       this.plotSurface(
         ctx,
         this.xValues,
-        layer.yValues,
+        layer,
         "dimgray",
         this.showHC ? layer.velocityLayer.color : layer.color,
-        fill,
-        line
+        false,
+        fill
       );
+    });
+
+    // lines
+    this.activeLayers.forEach((layer) => {
+      if (!layer.isContact)
+        this.plotSurface(
+          ctx,
+          this.xValues,
+          layer,
+          "dimgray",
+          "dimgray",
+          true,
+          false
+        );
+
+      // if (layer.isContact) {
+      //   var radius = 5; // Radius of the circle
+      //   var color = "white"; // Color of the circle
+      //   var z =
+      //     domain == Domain.DomDepth
+      //       ? layer.contactControlDepth
+      //       : layer.contactControlTime;
+      //   var y = toScreenY(z, height, minZ, maxZ);
+      //   var x = this.toScreenX(layer.contactControlIndex, width);
+      //   ctx.beginPath();
+      //   ctx.arc(x, y, radius, 0, 2 * Math.PI);
+      //   ctx.fillStyle = color;
+      //   ctx.fill();
+      //   ctx.closePath();
+      //   ctx.strokeStyle = "rgb(0,0,0)";
+      //   ctx.lineWidth = 1;
+      //   ctx.stroke();
+      // }
     });
 
     // cursor
     if (this.pointerIndex != -1 && this.pointerDomain != domain) {
       if (domain == Domain.DomTime) {
-        var sy = toScreenY(this.pointerTime, h, minZ, maxZ);
-        var sx = this.toScreenX(this.pointerIndex, w);
+        var sy = toScreenY(this.pointerTime, height, minZ, maxZ);
+        var sx = this.toScreenX(this.pointerIndex, width);
       } else {
-        var sy = toScreenY(this.pointerDepth, h, minZ, maxZ);
-        var sx = this.toScreenX(this.pointerIndex, w);
+        var sy = toScreenY(this.pointerDepth, height, minZ, maxZ);
+        var sx = this.toScreenX(this.pointerIndex, width);
       }
 
       var siz = 3;
@@ -852,13 +1021,13 @@ export class USection {
       const layerA = this.activeRegularLayers[index];
       const aY = layerA.yValues[0];
       const bY =
-        index + 1 < n ? this.activeRegularLayers[index + 1].yValues[0] : h;
+        index + 1 < n ? this.activeRegularLayers[index + 1].yValues[0] : height;
       ctx.fillText(layerA.name, this.x0 - 5, (aY + bY) / 2);
     }
 
-    this.drawgrid(ctx, canvas.width, h, minZ, maxZ);
-    this.drawstatus(ctx, canvas.width, h);
-    this.drawFrame(ctx, w, h);
+    this.drawgrid(ctx, canvas.width, height, minZ, maxZ);
+    this.drawstatus(ctx, canvas.width, height);
+    this.drawFrame(ctx, width, height);
   }
 
   drawgrid(ctx, w, h, minZ, maxZ) {
@@ -964,8 +1133,10 @@ export class USection {
     return { x: mouseX, y: mouseY };
   }
 
-  plotSurface(ctx, xValues, yValues, style, fillColor, showLine, showFill) {
+  plotSurface(ctx, xValues, layer, style, fillColor, showLine, showFill) {
     var height = ctx.canvas.height;
+
+    const yValues = layer.yValues;
 
     // fill
     if (showFill) {

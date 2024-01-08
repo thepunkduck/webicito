@@ -2,7 +2,7 @@ import { Domain } from "./quiacito.js";
 import { USection } from "./quiacito.js";
 import { SEAWATER } from "./quiacito.js";
 
-var LAYER_WIDTH = 200;
+var LAYER_WIDTH = 400;
 var SMOOTH_WIN = 7;
 var TAPER_WIN = 1;
 var uSection = null;
@@ -10,7 +10,7 @@ var uSection = null;
 var mX = 0;
 var mY = 0;
 var rZ = 0;
-var frame = 0;
+var mIdx = -1;
 var editingDomain = Domain.None;
 
 var editLayer;
@@ -31,6 +31,8 @@ init();
 function init() {
   console.log("init!!!");
 
+  SMOOTH_WIN = Math.ceil(LAYER_WIDTH / 30);
+  SMOOTH_WIN = Math.floor(SMOOTH_WIN / 2) * 2 + 1;
   TAPER_WIN = SMOOTH_WIN;
 
   let canvas = document.getElementById("canvasTime");
@@ -69,7 +71,6 @@ function init() {
     addOutsideEventListener("canvasDepth");
   });
 
-  window.requestAnimationFrame(draw);
   window.addEventListener("resize", resizeCanvas, false);
 
   // Event for 'h' key press
@@ -121,6 +122,7 @@ function init() {
   });
 
   resetSection();
+  draw();
 }
 
 export function resetSection() {
@@ -164,7 +166,7 @@ export function resetSection() {
   document.getElementById("showHC").checked = uSection.showHC;
 
   changedHydrocarbon();
-  uSection.update_TimeFromDepth(null);
+  uSection.update_From(Domain.DomDepth);
 }
 
 function addOutsideEventListener(canvasName) {
@@ -228,19 +230,15 @@ export function changedHydrocarbon() {
   uSection.showLayerNames = layerNames;
   uSection.showHC = showHC;
 
-  uSection.flattenContacts();
+  uSection.flattenContactsInDepth();
   uSection.ensureHChasThickness();
-  uSection.update_TimeFromDepth(null);
+  uSection.update_From(Domain.DomDepth);
   uSection.autosetVerticalRanges();
-  draw();
 }
 
 function draw() {
   uSection.drawSection(Domain.DomTime, "canvasTime");
   uSection.drawSection(Domain.DomDepth, "canvasDepth");
-
-  // movement??
-  frame++;
   window.requestAnimationFrame(draw);
 }
 
@@ -284,15 +282,6 @@ function startEdit(domain, e) {
 
   edited_i0 = edited_i1 = idx;
 
-  // convert if needed
-  if (
-    editLayer != null &&
-    editLayer.isContact &&
-    editingDomain == Domain.DomTime
-  ) {
-    uSection.setupQuickTimeToDepth(editLayer);
-  }
-
   if (editLayer != null) {
     initialZ = editLayer.snapShot(editingDomain);
     editZ = editLayer.snapShot(editingDomain);
@@ -304,14 +293,11 @@ function moveEdit(domain, e) {
   mX = coord.x;
   mY = coord.y;
   rZ = uSection.pointerTo(domain, mY);
-  let idx = uSection.getIndex(mX);
+  mIdx = uSection.getIndex(mX);
 
-  if (domain == Domain.DomTime) {
-    uSection.setCursor(rZ, uSection.convertTimeToDepth(rZ, idx), idx);
-  } else {
-    var pT = uSection.convertDepthToTime(rZ, idx);
-    uSection.setCursor(pT, rZ, idx);
-  }
+  if (domain == Domain.DomTime)
+    uSection.setCursor(rZ, uSection.convertTimeToDepth(rZ, mIdx), mIdx);
+  else uSection.setCursor(uSection.convertDepthToTime(rZ, mIdx), rZ, mIdx);
 
   uSection.pointerDomain = domain;
 
@@ -325,7 +311,6 @@ function moveEdit(domain, e) {
       wholeZ = editLayer.snapShot(editingDomain);
       fixY = rZ;
     }
-
     wasWholeLayerShift = true;
   } else {
     wasWholeLayerShift = false;
@@ -338,127 +323,99 @@ function moveEdit(domain, e) {
 
   wasShiftKeyPressed = isShiftKeyPressed;
 
-  if (editingDomain == domain) {
-    if (editLayer != null) {
-      var layerA = uSection.getActiveRegularLayerAbove(editLayer);
-      var layerB = uSection.getActiveRegularLayerBelow(editLayer);
+  if (editingDomain != domain) return;
+  if (editLayer == null) return;
 
-      if (editLayer.isContact) {
-        if (editingDomain == Domain.DomDepth)
-          uSection.adjustContactDepth(editLayer, rZ, idx, true);
-        else {
-          // rough convert time to depth to
-          var roughDepth = uSection.quickConvert(rZ, idx);
-          uSection.adjustContactDepth(editLayer, roughDepth, idx, false);
-          uSection.update_TimeFromDepth(editLayer);
-          var vizBelow = uSection.getActiveLayerBelow(editLayer);
-          // restrict editlayer in TIME. Times below unaffected
-          if (vizBelow != null)
-            for (let i = 0; i < uSection.length; i++)
-              editLayer.point[i].time = Math.min(
-                editLayer.point[i].time,
-                vizBelow.point[i].time
-              );
-        }
-      } else {
-        // REGULAR
-
-        if (idx != -1) {
-          let ia = 0;
-          let ib = 0;
-          let ya = 0;
-          let yb = 0;
-          if (idx > prevIdx) {
-            ia = prevIdx;
-            ib = idx;
-            ya = prevY;
-            yb = mY;
-          } else {
-            ia = idx;
-            ib = prevIdx;
-            ya = mY;
-            yb = prevY;
-          }
-
-          edited_i0 = Math.min(edited_i0, idx);
-          edited_i1 = Math.max(edited_i1, idx);
-
-          if (wasWholeLayerShift) {
-            var dZ = rZ - fixY;
-            for (let i = 0; i < LAYER_WIDTH; i++) editZ[i] = wholeZ[i] + dZ;
-            uSection.overwriteLayer(editLayer, editingDomain, editZ);
-          } else {
-            if (wasCtrlKeyPressed) {
-              // flat parts
-              ya = fixY;
-              yb = fixY;
-              mY = fixY;
-            }
-
-            for (let i = ia; i <= ib; i++) {
-              let y = ib == ia ? ya : ((yb - ya) * (i - ia)) / (ib - ia) + ya;
-
-              if (editingDomain == Domain.DomTime) {
-                var minZ =
-                  layerA != null ? layerA.point[i].time : -Number.MAX_VALUE;
-                var maxZ =
-                  layerB != null ? layerB.point[i].time : Number.MAX_VALUE;
-                var z = uSection.pointerTo(editingDomain, y);
-                if (z < minZ) z = minZ;
-                if (z > maxZ) z = maxZ;
-                editZ[i] = z;
-              } else {
-                // depth edit is a little different!
-                var minZ =
-                  layerA.name == SEAWATER
-                    ? -Number.MAX_VALUE
-                    : layerA.point[i].depth;
-                var maxZ =
-                  layerB != null ? layerB.point[i].depth : Number.MAX_VALUE;
-                var z = uSection.pointerTo(editingDomain, y);
-                if (z < minZ) z = minZ;
-                if (z > maxZ) z = maxZ;
-                editZ[i] = z;
-              }
-            }
-
-            // smoothed version of editZ
-            // -> push edit range (taper?) to editLayer
-            uSection.overwriteLayer(editLayer, editingDomain, initialZ);
-
-            // extend edges horizontally
-            var n = LAYER_WIDTH;
-            const tmp = new Array(n).fill(0.0);
-            for (let i = 0; i < n; i++) {
-              if (i < edited_i0) tmp[i] = editZ[edited_i0];
-              else if (i > edited_i1) tmp[i] = editZ[edited_i1];
-              else tmp[i] = editZ[i];
-            }
-            var smoothZ = smooth(tmp, SMOOTH_WIN);
-            uSection.overwriteLayerRange(
-              editLayer,
-              editingDomain,
-              smoothZ,
-              edited_i0,
-              edited_i1,
-              TAPER_WIN
-            );
-          }
-          prevIdx = idx;
-          prevY = mY;
-        }
-      }
-
-      if (editingDomain == Domain.DomTime) {
-        uSection.update_DepthFromTime(null);
-        uSection.flattenContacts();
-        uSection.update_TimeFromDepth(null);
-      } else {
-        uSection.flattenContacts();
-        uSection.update_TimeFromDepth(null);
-      }
+  if (editLayer.isContact) {
+    if (domain == Domain.DomDepth)
+      uSection.adjustContactDepth(editLayer, rZ, mIdx, true);
+    else {
+      editLayer.contactControlTime = rZ;
+      editLayer.contactControlIndex = mIdx;
     }
-  }
+  } else {
+    // REGULAR
+    var layerA = uSection.getActiveRegularLayerAbove(editLayer);
+    var layerB = uSection.getActiveRegularLayerBelow(editLayer);
+    if (mIdx != -1) {
+      let ia = 0;
+      let ib = 0;
+      let ya = 0;
+      let yb = 0;
+      if (mIdx > prevIdx) {
+        ia = prevIdx;
+        ib = mIdx;
+        ya = prevY;
+        yb = mY;
+      } else {
+        ia = mIdx;
+        ib = prevIdx;
+        ya = mY;
+        yb = prevY;
+      }
+
+      edited_i0 = Math.min(edited_i0, mIdx);
+      edited_i1 = Math.max(edited_i1, mIdx);
+
+      if (wasWholeLayerShift) {
+        var dZ = rZ - fixY;
+        for (let i = 0; i < LAYER_WIDTH; i++) editZ[i] = wholeZ[i] + dZ;
+        uSection.overwriteLayer(editLayer, editingDomain, editZ);
+      } else {
+        if (wasCtrlKeyPressed) {
+          // flat parts
+          ya = fixY;
+          yb = fixY;
+          mY = fixY;
+        }
+
+        var minZ = 0.0;
+        var maxZ = 0.0;
+        for (let i = ia; i <= ib; i++) {
+          let y = ib == ia ? ya : ((yb - ya) * (i - ia)) / (ib - ia) + ya;
+
+          if (editingDomain == Domain.DomDepth) {
+            minZ =
+              layerA.name == SEAWATER
+                ? -Number.MAX_VALUE
+                : layerA.point[i].depth;
+            maxZ = layerB != null ? layerB.point[i].depth : Number.MAX_VALUE;
+          } else {
+            minZ = layerA != null ? layerA.point[i].time : -Number.MAX_VALUE;
+            maxZ = layerB != null ? layerB.point[i].time : Number.MAX_VALUE;
+          }
+          var z = uSection.pointerTo(editingDomain, y);
+          if (z < minZ) z = minZ;
+          if (z > maxZ) z = maxZ;
+          editZ[i] = z;
+        } //end little loop
+
+        // extend edges horizontally
+        const tmp = new Array(LAYER_WIDTH).fill(0.0);
+        for (let i = 0; i < LAYER_WIDTH; i++) {
+          if (i < edited_i0) tmp[i] = editZ[edited_i0];
+          else if (i > edited_i1) tmp[i] = editZ[edited_i1];
+          else tmp[i] = editZ[i];
+        }
+
+        // simply overwrite in TIME/DEPTH
+        uSection.overwriteLayer(editLayer, editingDomain, initialZ);
+        uSection.overwriteLayerRange(
+          editLayer,
+          editingDomain,
+          tmp,
+          edited_i0,
+          edited_i1,
+          SMOOTH_WIN,
+          TAPER_WIN
+        );
+      } // end free edit
+      prevIdx = mIdx;
+      prevY = mY;
+    }
+  } // end regular layer edit
+
+  uSection.update_From(editingDomain);
 }
 
 function endEdit(e) {
@@ -476,20 +433,4 @@ function endEdit(e) {
 
 function touchEnd(e) {
   mouseOut(e);
-}
-
-function smooth(zArray, win) {
-  const n = zArray.length;
-  const smoothed = new Array(n).fill(0.0);
-  const hwin = Math.floor(win / 2);
-  for (let j = 0; j < win; j++) {
-    var offset = j - hwin;
-    for (let i = 0; i < n; i++) {
-      var ia = i + offset;
-      if (ia < 0) ia = 0;
-      if (ia >= n) ia = n - 1;
-      smoothed[i] += zArray[ia] / win;
-    }
-  }
-  return smoothed;
 }
