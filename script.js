@@ -38,7 +38,7 @@ function init() {
   SMOOTH_WIN = isMobile ? SMOOTH_WIN_MOBILE : SMOOTH_WIN_DESKTOP;
   SMOOTH_WIN = Math.floor(SMOOTH_WIN / 2) * 2 + 1;
 
-  console.log("init!!! " + (isMobile ? "MOBILE" : "DESKTOP"));
+  console.log("init! " + (isMobile ? "MOBILE" : "DESKTOP"));
 
   let canvas = document.getElementById("canvasTime");
   canvas.addEventListener("mousedown", startEditTIME);
