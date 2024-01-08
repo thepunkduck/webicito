@@ -3,8 +3,9 @@ import { USection } from "./quiacito.js";
 import { SEAWATER } from "./quiacito.js";
 
 var LAYER_WIDTH = 400;
-var SMOOTH_WIN = 7;
-var TAPER_WIN = 1;
+const SMOOTH_WIN_MOBILE = 13;
+const SMOOTH_WIN_DESKTOP = 7;
+var SMOOTH_WIN = 11;
 var uSection = null;
 
 var mX = 0;
@@ -29,11 +30,15 @@ var wasWholeLayerShift = false;
 init();
 
 function init() {
-  console.log("init!!!");
+  const isMobile =
+    /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent
+    );
 
-  SMOOTH_WIN = Math.ceil(LAYER_WIDTH / 30);
+  SMOOTH_WIN = isMobile ? SMOOTH_WIN_MOBILE : SMOOTH_WIN_DESKTOP;
   SMOOTH_WIN = Math.floor(SMOOTH_WIN / 2) * 2 + 1;
-  TAPER_WIN = SMOOTH_WIN;
+
+  console.log("init!!! " + (isMobile ? "MOBILE" : "DESKTOP"));
 
   let canvas = document.getElementById("canvasTime");
   canvas.addEventListener("mousedown", startEditTIME);
@@ -406,8 +411,7 @@ function moveEdit(domain, e) {
           tmp,
           edited_i0,
           edited_i1,
-          SMOOTH_WIN,
-          TAPER_WIN
+          SMOOTH_WIN
         );
       } // end free edit
       prevIdx = mIdx;

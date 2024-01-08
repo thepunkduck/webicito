@@ -245,8 +245,8 @@ export class USection {
     }
   }
 
-  overwriteLayerRange(layer, domain, inputZ, i0, i1, smoothW, taperW) {
-    if (this.taper.length != taperW) this.taper = this.calcTaper(taperW);
+  overwriteLayerRange(layer, domain, inputZ, i0, i1, smoothW) {
+    //if (this.taper.length != taperW) this.taper = this.calcTaper(taperW);
 
     // clamping layers
     let layerA = this.getActiveRegularLayerAbove(layer);
@@ -265,22 +265,22 @@ export class USection {
     }
 
     // tapering
-    for (let i = 1; i < taperW; i++) {
-      var f = this.taper[i];
-      var ia = i1 + i;
-      if (ia < this.length) {
-        minZ = layerA != null ? layerA.getZ(domain, ia) : -Number.MAX_VALUE;
-        maxZ = layerB != null ? layerB.getZ(domain, ia) : Number.MAX_VALUE;
-        wholeZ[ia] = clamp(f * wholeZ[ia] + (1 - f) * inputZ[ia], minZ, maxZ);
-      }
+    // for (let i = 1; i < taperW; i++) {
+    //   var f = this.taper[i];
+    //   var ia = i1 + i;
+    //   if (ia < this.length) {
+    //     minZ = layerA != null ? layerA.getZ(domain, ia) : -Number.MAX_VALUE;
+    //     maxZ = layerB != null ? layerB.getZ(domain, ia) : Number.MAX_VALUE;
+    //     //   wholeZ[ia] = clamp(f * wholeZ[ia] + (1 - f) * inputZ[ia], minZ, maxZ);
+    //   }
 
-      ia = i0 - i;
-      if (ia >= 0) {
-        minZ = layerA != null ? layerA.getZ(domain, ia) : -Number.MAX_VALUE;
-        maxZ = layerB != null ? layerB.getZ(domain, ia) : Number.MAX_VALUE;
-        wholeZ[ia] = clamp(f * wholeZ[ia] + (1 - f) * inputZ[ia], minZ, maxZ);
-      }
-    }
+    //   ia = i0 - i;
+    //   if (ia >= 0) {
+    //     minZ = layerA != null ? layerA.getZ(domain, ia) : -Number.MAX_VALUE;
+    //     maxZ = layerB != null ? layerB.getZ(domain, ia) : Number.MAX_VALUE;
+    //     //    wholeZ[ia] = clamp(f * wholeZ[ia] + (1 - f) * inputZ[ia], minZ, maxZ);
+    //   }
+    // }
 
     // then smooth
     var smoothZ = this.smooth(wholeZ, smoothW);
@@ -292,10 +292,10 @@ export class USection {
       smoothZ[i] = clamp(smoothZ[i], minZ, maxZ);
     }
 
-    // set taper-extended range
-    i0 -= taperW;
+    // set smoothing-extended range
+    i0 -= smoothW + 1;
     if (i0 < 0) i0 = 0;
-    i1 += taperW;
+    i1 += smoothW + 1;
     if (i1 >= layer.length) i1 = layer.length - 1;
 
     for (let i = i0; i <= i1; i++) {
