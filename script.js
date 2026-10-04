@@ -3,16 +3,22 @@ import { USection } from "./quiacito.js";
 import { SEAWATER } from "./quiacito.js";
 
 var LAYER_WIDTH = 400;
-const SMOOTH_WIN_MOBILE = 13;
-const SMOOTH_WIN_DESKTOP = 7;
-var SMOOTH_WIN = 11;
+const SMOOTH_WIN_TOUCH = 13;
+const SMOOTH_WIN_MOUSE = 7;
+var SMOOTH_WIN = SMOOTH_WIN_MOUSE;
 var uSection = null;
+
+// Edit mode chosen on the toolbar. Keyboard modifiers still work on desktop:
+// Ctrl = flat, Shift+Ctrl = move whole layer.
+export const EditMode = { Draw: "draw", Flat: "flat", Move: "move" };
+var editMode = EditMode.Draw;
 
 var mX = 0;
 var mY = 0;
 var rZ = 0;
 var mIdx = -1;
 var editingDomain = Domain.None;
+var activePointerId = null;
 
 var editLayer;
 var prevIdx = -1;
@@ -27,79 +33,46 @@ var wasShiftKeyPressed = false;
 var wasCtrlKeyPressed = false;
 var wasWholeLayerShift = false;
 
+var drawPending = false;
+
 init();
 
 function init() {
-  const isMobile =
-    /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
-      navigator.userAgent
-    );
+  setupCanvas("canvasTime", Domain.DomTime);
+  setupCanvas("canvasDepth", Domain.DomDepth);
 
-  SMOOTH_WIN = isMobile ? SMOOTH_WIN_MOBILE : SMOOTH_WIN_DESKTOP;
-  SMOOTH_WIN = Math.floor(SMOOTH_WIN / 2) * 2 + 1;
+  // Redraw when the panels change size (rotation, window resize, toolbar wrap...)
+  if ("ResizeObserver" in window) {
+    const ro = new ResizeObserver(requestDraw);
+    ro.observe(document.getElementById("canvasTime"));
+    ro.observe(document.getElementById("canvasDepth"));
+  }
+  window.addEventListener("resize", requestDraw, false);
+  // Labels use the Exo web font; redraw once it has arrived
+  if (document.fonts) document.fonts.ready.then(requestDraw);
 
-  console.log("init! " + (isMobile ? "MOBILE" : "DESKTOP"));
-
-  let canvas = document.getElementById("canvasTime");
-  canvas.addEventListener("mousedown", startEditTIME);
-  canvas.addEventListener("mousemove", moveEditTIME);
-  canvas.addEventListener("mouseup", endEdit);
-  canvas.addEventListener("mouseout", mouseOut);
-  canvas.addEventListener("touchstart", startEditTIME);
-  canvas.addEventListener("touchmove", moveEditTIME);
-  canvas.addEventListener("touchend", endEdit);
-  canvas.addEventListener("touchend", touchEnd);
-
-  canvas = document.getElementById("canvasDepth");
-  canvas.addEventListener("mousedown", startEditDEPTH);
-  canvas.addEventListener("mousemove", moveEditDEPTH);
-  canvas.addEventListener("mouseup", endEdit);
-  canvas.addEventListener("mouseout", mouseOut);
-  canvas.addEventListener("touchstart", startEditDEPTH);
-  canvas.addEventListener("touchmove", moveEditDEPTH);
-  canvas.addEventListener("touchend", endEdit);
-  canvas.addEventListener("touchend", touchEnd);
-
-  // Prevent scrolling on touchscreen devices
-  document.body.addEventListener(
-    "touchmove",
-    function (e) {
-      if (editingDomain != Domain.None) {
-        e.preventDefault();
-      }
-    },
-    { passive: false }
-  );
-
-  document.addEventListener("DOMContentLoaded", function () {
-    addOutsideEventListener("canvasTime");
-    addOutsideEventListener("canvasDepth");
-  });
-
-  window.addEventListener("resize", resizeCanvas, false);
-
-  // Event for 'h' key press
   document.addEventListener("keydown", function (event) {
-    if (event.key === "h") {
+    const key = event.key.toLowerCase();
+    if (key === "h") {
       uSection.showHC = !uSection.showHC;
       document.getElementById("showHC").checked = uSection.showHC;
     }
-    if (event.key === "l") {
+    if (key === "l") {
       uSection.showLayerNames = !uSection.showLayerNames;
       document.getElementById("layerNames").checked = uSection.showLayerNames;
     }
 
-    if (event.key === "1") {
+    if (key === "1") {
       document.getElementById("gasA").checked =
         uSection.toggleLayerActive("GasA");
       checkboxChanged();
     }
-    if (event.key === "2") {
+    if (key === "2") {
       document.getElementById("oilA").checked =
         uSection.toggleLayerActive("OilA");
       checkboxChanged();
     }
-    if (event.key === "3") {
+    if (key === "3") {
       document.getElementById("resA").checked =
         uSection.toggleCompartmentRestriction("GasA");
       document.getElementById("resA").checked =
@@ -107,27 +80,82 @@ function init() {
       checkboxChanged();
     }
 
-    if (event.key === "4") {
+    if (key === "4") {
       document.getElementById("gasB").checked =
         uSection.toggleLayerActive("GasB");
       checkboxChanged();
     }
-    if (event.key === "5") {
+    if (key === "5") {
       document.getElementById("oilB").checked =
         uSection.toggleLayerActive("OilB");
       checkboxChanged();
     }
-    if (event.key === "6") {
+    if (key === "6") {
       document.getElementById("resB").checked =
         uSection.toggleCompartmentRestriction("GasB");
       document.getElementById("resB").checked =
         uSection.toggleCompartmentRestriction("OilB");
       checkboxChanged();
     }
+    requestDraw();
   });
 
   resetSection();
-  draw();
+}
+
+function setupCanvas(id, domain) {
+  const canvas = document.getElementById(id);
+
+  canvas.addEventListener("pointerdown", (e) => {
+    if (!e.isPrimary || activePointerId !== null) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    e.preventDefault();
+    activePointerId = e.pointerId;
+    // keep receiving moves even if the finger/mouse leaves the canvas
+    try {
+      canvas.setPointerCapture(e.pointerId);
+    } catch (_) {}
+    startEdit(domain, e);
+    updateCursor(domain, e); // show the read-out immediately on touch
+    requestDraw();
+  });
+
+  canvas.addEventListener("pointermove", (e) => {
+    if (activePointerId !== null && e.pointerId !== activePointerId) return;
+    // Hovering only makes sense with a mouse or pen
+    if (activePointerId === null && e.pointerType === "touch") return;
+    moveEdit(domain, e);
+    requestDraw();
+  });
+
+  const finish = (e) => {
+    if (e.pointerId !== activePointerId) return;
+    activePointerId = null;
+    endEdit(e);
+    // a finger lifted off the glass leaves no hover cursor behind
+    if (e.pointerType !== "mouse") pointerOut();
+    requestDraw();
+  };
+  canvas.addEventListener("pointerup", finish);
+  canvas.addEventListener("pointercancel", finish);
+
+  canvas.addEventListener("pointerleave", (e) => {
+    if (activePointerId !== null) return;
+    pointerOut();
+    requestDraw();
+  });
+
+  // no long-press context menu on Android
+  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+}
+
+export function setEditMode(mode) {
+  editMode = mode;
+  document.querySelectorAll(".toolbar .mode").forEach((btn) => {
+    const on = btn.dataset.mode === mode;
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-checked", on ? "true" : "false");
+  });
 }
 
 export function resetSection() {
@@ -153,11 +181,8 @@ export function resetSection() {
   uSection.setVerticalRange(Domain.DomDepth, -200.0, 5000.0);
   uSection.setVerticalRange(Domain.DomTime, -200.0, 4000.0);
 
-  let canvas = document.getElementById("canvasTime");
-  uSection.canvasTime = canvas;
-
-  canvas = document.getElementById("canvasDepth");
-  uSection.canvasDepth = canvas;
+  uSection.canvasTime = document.getElementById("canvasTime");
+  uSection.canvasDepth = document.getElementById("canvasDepth");
   uSection.showLayerNames = last_showLayerNames;
   uSection.showHC = true;
 
@@ -170,53 +195,39 @@ export function resetSection() {
   document.getElementById("layerNames").checked = uSection.showLayerNames;
   document.getElementById("showHC").checked = uSection.showHC;
 
+  // Draw once so the screen positions used for hit-testing exist
+  draw();
   changedHydrocarbon();
   uSection.update_From(Domain.DomDepth);
-}
-
-function addOutsideEventListener(canvasName) {
-  var canvas = document.getElementById(canvasName);
-
-  canvas.addEventListener("mousedown", function (e) {
-    document.addEventListener("mouseup", function mouseUpHandler(e) {
-      // Your mouseup code here, even if it's outside the canvas
-      endEdit(e);
-      // Remove the mouseup event listener from the document
-      document.removeEventListener("mouseup", mouseUpHandler);
-      document.removeEventListener("mouseup", mouseUpHandler);
-    });
-  });
+  requestDraw();
 }
 
 export function toggleMenu() {
-  console.log("toggle");
   const menuList = document.querySelector(".menu-list");
-  menuList.classList.toggle("active");
+  const open = menuList.classList.toggle("active");
+  document.querySelector(".menu-icon").setAttribute("aria-expanded", open);
 }
 
 export function dismissMenu() {
   const menuList = document.querySelector(".menu-list");
   menuList.classList.remove("active");
+  const btn = document.querySelector(".menu-icon");
+  if (btn) btn.setAttribute("aria-expanded", "false");
 }
 
 export function checkboxChanged() {
-  dismissMenu();
   changedHydrocarbon();
 }
 
 export function changedCompartment() {
   changedHydrocarbon();
 }
-export function changedHydrocarbon() {
-  var oilA = false;
-  var oilB = false;
-  var gasA = false;
-  var gasB = false;
 
-  gasA = document.getElementById("gasA").checked;
-  gasB = document.getElementById("gasB").checked;
-  oilA = document.getElementById("oilA").checked;
-  oilB = document.getElementById("oilB").checked;
+export function changedHydrocarbon() {
+  var gasA = document.getElementById("gasA").checked;
+  var gasB = document.getElementById("gasB").checked;
+  var oilA = document.getElementById("oilA").checked;
+  var oilB = document.getElementById("oilB").checked;
   var resA = document.getElementById("resA").checked;
   var resB = document.getElementById("resB").checked;
   var layerNames = document.getElementById("layerNames").checked;
@@ -239,45 +250,41 @@ export function changedHydrocarbon() {
   uSection.ensureHChasThickness();
   uSection.update_From(Domain.DomDepth);
   uSection.autosetVerticalRanges();
+  requestDraw();
+}
+
+// Draw only when something changed, not every frame - saves battery on phones.
+function requestDraw() {
+  if (drawPending) return;
+  drawPending = true;
+  window.requestAnimationFrame(() => {
+    drawPending = false;
+    draw();
+  });
 }
 
 function draw() {
   uSection.drawSection(Domain.DomTime, "canvasTime");
   uSection.drawSection(Domain.DomDepth, "canvasDepth");
-  window.requestAnimationFrame(draw);
 }
 
-function resizeCanvas() {}
-
-function startEditTIME(e) {
-  startEdit(Domain.DomTime, e);
-}
-
-function startEditDEPTH(e) {
-  startEdit(Domain.DomDepth, e);
-}
-
-function moveEditTIME(e) {
-  moveEdit(Domain.DomTime, e);
-}
-
-function moveEditDEPTH(e) {
-  moveEdit(Domain.DomDepth, e);
-}
-
-function mouseOut(e) {
+function pointerOut() {
   uSection.pointerDomain = Domain.None;
   uSection.setCursor(NaN, NaN, -1);
 }
 
 function startEdit(domain, e) {
   dismissMenu();
+  const isTouch = e.pointerType !== "mouse";
+  SMOOTH_WIN = isTouch ? SMOOTH_WIN_TOUCH : SMOOTH_WIN_MOUSE;
+
   let coord = uSection.handleXY(domain, e);
   mX = coord.x;
   mY = coord.y;
 
   editingDomain = domain;
-  editLayer = uSection.getLayerAtPointer(editingDomain, mX, mY);
+  // fingers are less precise than a mouse: grab layers from further away
+  editLayer = uSection.getLayerAtPointer(editingDomain, mX, mY, isTouch ? 24 : 10);
   let idx = uSection.getIndex(mX);
 
   if (idx < 0) return;
@@ -293,7 +300,7 @@ function startEdit(domain, e) {
   }
 }
 
-function moveEdit(domain, e) {
+function updateCursor(domain, e) {
   let coord = uSection.handleXY(domain, e);
   mX = coord.x;
   mY = coord.y;
@@ -305,10 +312,16 @@ function moveEdit(domain, e) {
   else uSection.setCursor(uSection.convertDepthToTime(rZ, mIdx), rZ, mIdx);
 
   uSection.pointerDomain = domain;
+}
 
+function moveEdit(domain, e) {
+  updateCursor(domain, e);
+
+  // Toolbar mode, or the original desktop keyboard modifiers
+  var isWholeLayerShift =
+    editMode === EditMode.Move || (e.shiftKey && e.ctrlKey);
+  var isFlat = editMode === EditMode.Flat || e.ctrlKey;
   var isShiftKeyPressed = e.shiftKey;
-  var isCtrlKeyPressed = e.ctrlKey;
-  var isWholeLayerShift = isShiftKeyPressed && isCtrlKeyPressed;
 
   if (editLayer != null && isWholeLayerShift) {
     if (!wasWholeLayerShift) {
@@ -321,7 +334,7 @@ function moveEdit(domain, e) {
     wasWholeLayerShift = false;
   }
 
-  if (!wasWholeLayerShift && isCtrlKeyPressed) {
+  if (!wasWholeLayerShift && isFlat) {
     if (!wasCtrlKeyPressed) fixY = mY;
     wasCtrlKeyPressed = true;
   } else wasCtrlKeyPressed = false;
@@ -433,8 +446,4 @@ function endEdit(e) {
   wasShiftKeyPressed = false;
   wasCtrlKeyPressed = false;
   wasWholeLayerShift = false;
-}
-
-function touchEnd(e) {
-  mouseOut(e);
 }

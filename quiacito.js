@@ -914,14 +914,28 @@ export class USection {
   drawSection(domain, name) {
     var canvas = document.getElementById(name);
     var ctx = canvas.getContext("2d");
-    canvas.height = (window.innerHeight - 140) / 2;
-    canvas.width = window.innerWidth;
-    ctx.clearRect(0, 0, window.innerWidth, canvas.height);
+
+    // Size the backing store to the on-screen size x devicePixelRatio so lines
+    // and text are crisp on high-density phone screens. All drawing and
+    // pointer maths below is in CSS pixels.
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = Math.max(1, canvas.clientWidth);
+    const cssH = Math.max(1, canvas.clientHeight);
+    const pxW = Math.round(cssW * dpr);
+    const pxH = Math.round(cssH * dpr);
+    if (canvas.width !== pxW || canvas.height !== pxH) {
+      canvas.width = pxW;
+      canvas.height = pxH;
+    }
+    canvas.cssWidth = cssW;
+    canvas.cssHeight = cssH;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
     ctx.save();
 
     this.x0 = this.showLayerNames ? LEFT_SPACE : 0;
-    var width = canvas.width - this.x0;
-    var height = canvas.height;
+    var width = cssW - this.x0;
+    var height = cssH;
     // get the vertical range for this domain
     var minZ = 0;
     var maxZ = 100;
@@ -1025,9 +1039,10 @@ export class USection {
       ctx.fillText(layerA.name, this.x0 - 5, (aY + bY) / 2);
     }
 
-    this.drawgrid(ctx, canvas.width, height, minZ, maxZ);
-    this.drawstatus(ctx, canvas.width, height);
+    this.drawgrid(ctx, cssW, height, minZ, maxZ);
+    this.drawstatus(ctx, cssW, height);
     this.drawFrame(ctx, width, height);
+    ctx.restore();
   }
 
   drawgrid(ctx, w, h, minZ, maxZ) {
@@ -1056,36 +1071,41 @@ export class USection {
   }
 
   drawstatus(ctx, w, h) {
-    ctx.font = "12px exo";
+    // On narrow (phone) screens use short labels so the read-out fits
+    const compact = w < 480;
+    const step = compact ? 70 : 80;
+    ctx.font = (compact ? "11px" : "12px") + " exo";
     ctx.textAlign = "left";
     ctx.textBaseline = "bottom";
     ctx.fillStyle = "white";
-    var x = w - 270; //this.x0 + 5;
-    var y = h;
+    var x = w - (compact ? 3 * step + 4 : 270);
+    var y = h - 2;
 
     var BLANK = " ";
-    var txtT = "Time: ";
+    var txtT = compact ? "T: " : "Time: ";
     if (this.pointerDomain != Domain.None)
       txtT += isNaN(this.pointerTime)
         ? BLANK
         : Math.round(this.pointerTime) + "ms";
 
-    var txtD = this.pointerDepth < 0 ? "Elevation: " : "Depth: ";
+    var txtD = this.pointerDepth < 0
+      ? (compact ? "E: " : "Elevation: ")
+      : (compact ? "D: " : "Depth: ");
     if (this.pointerDomain != Domain.None)
       txtD += isNaN(this.pointerDepth)
         ? BLANK
         : Math.abs(Math.round(this.pointerDepth)) + "m ";
 
-    var txtV = "Velocity: ";
+    var txtV = compact ? "V: " : "Velocity: ";
     if (this.pointerDomain != Domain.None)
       txtV += isNaN(this.pointerVelocity)
         ? BLANK
         : Math.round(this.pointerVelocity) + "m/s";
 
     ctx.fillText(txtT, x, y);
-    x += 80;
+    x += step;
     ctx.fillText(txtD, x, y);
-    x += 80;
+    x += step;
     ctx.fillText(txtV, x, y);
   }
 
@@ -1120,21 +1140,20 @@ export class USection {
   handleXY(domain, e) {
     let canvas = domain == Domain.DomTime ? this.canvasTime : this.canvasDepth;
     const rect = canvas.getBoundingClientRect();
-    var scaleX = canvas.width / rect.width;
-    var scaleY = canvas.height / rect.height;
+    // drawing coordinates are CSS pixels (see drawSection)
+    var scaleX = (canvas.cssWidth || rect.width) / rect.width;
+    var scaleY = (canvas.cssHeight || rect.height) / rect.height;
 
-    const x = e.clientX || e.touches[0].clientX;
-    const y = e.clientY || e.touches[0].clientY;
-
-    var mouseX = (x - rect.left) * scaleX;
-    var mouseY = (y - rect.top) * scaleY;
+    const src = e.touches && e.touches.length ? e.touches[0] : e;
+    var mouseX = (src.clientX - rect.left) * scaleX;
+    var mouseY = (src.clientY - rect.top) * scaleY;
 
     //console.log("XY: " + mouseX + ", " + mouseY);
     return { x: mouseX, y: mouseY };
   }
 
   plotSurface(ctx, xValues, layer, style, fillColor, showLine, showFill) {
-    var height = ctx.canvas.height;
+    var height = ctx.canvas.cssHeight || ctx.canvas.height;
 
     const yValues = layer.yValues;
 
@@ -1171,10 +1190,9 @@ export class USection {
     }
   }
 
-  getLayerAtPointer(domain, x, y) {
+  getLayerAtPointer(domain, x, y, PIX = 10) {
     let idx = this.getIndex(x);
     if (idx == -1) return null;
-    const PIX = 10;
 
     let minDiff = Number.MAX_VALUE;
     let closeLayer = null;
@@ -1234,13 +1252,13 @@ export class USection {
 
   pointerToTime(y) {
     var dZ = this.maxTime - this.minTime;
-    let h = this.canvasTime.height;
+    let h = this.canvasTime.cssHeight || this.canvasTime.height;
     return (dZ * y) / h + this.minTime;
   }
 
   pointerToDepth(y) {
     var dZ = this.maxDepth - this.minDepth;
-    let h = this.canvasDepth.height;
+    let h = this.canvasDepth.cssHeight || this.canvasDepth.height;
     return (dZ * y) / h + this.minDepth;
   }
 

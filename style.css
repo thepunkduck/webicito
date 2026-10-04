@@ -1,225 +1,343 @@
+:root {
+  --green: #277a66;
+  --green-dark: #437e51;
+  --red: #921e1e;
+  --panel-bg: #f1f1f1;
+  --line: #ccc;
+  --gap: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
 body {
-  background-color: rgb(255, 255, 255);
-  font-family: "Exo", sans-serif;
-}
-
-.paragraph-container {
-  display: flex;
-  justify-content: left;
-  margin-left: 10px;
-}
-
-.custom-paragraph {
-  font-size: 14px;
-  width: 300px;
-  color: hsl(318, 66%, 52%);
-  padding: 0px;
-  margin: 2px;
-}
-
-label {
-  display: block;
-  margin-bottom: 5px;
-}
-
-select {
-  width: 200px;
-  padding: 5px;
-}
-
-canvas {
-  margin-left: 0px;
-  margin-right: 10px;
-  /* Calculate the width to fill available space */
-  width: calc(100% - 5px);
-  height: 400;
-  padding: 0;
-}
-
-/* Style for logo */
-#logo {
-  width: 100px; /* Set the width of your logo */
-  height: auto; /* Maintain aspect ratio */
-  margin: 0px; /* Optional: Add some margin */
-  margin-right: 10px; /* Optional: Add some spacing between logo and title */
-}
-
-/* Style for the title */
-h1 {
-  font-size: 20px;
-  display: flex; /* Use flexbox for layout */
-  align-items: center; /* Center items vertically */
-  color: #277a66;
   margin: 0;
-  padding: 0px;
+  height: 100%;
+}
+
+body {
+  background-color: #fff;
+  font-family: "Exo", sans-serif;
+  /* The app fills the screen; no page scrolling or pull-to-refresh */
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  font: inherit;
+}
+
+/* ---------- Header ---------- */
+
+header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+}
+
+.logo-link {
+  flex: none;
+  display: block;
+  line-height: 0;
+}
+
+.logo-img {
+  height: 40px;
+  width: auto;
+}
+
+h1 {
+  flex: 1;
+  min-width: 0;
+  font-size: 20px;
+  color: var(--green);
+  margin: 0;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 h2 {
-  color: #277a66;
+  color: var(--green);
 }
 
-/* Define color for h3 */
 h3 {
-  color: #921e1e;
-}
-
-.domain-h4 {
-  color: #921e1e;
-  padding: 0px;
-  margin: 0;
-  margin-right: 10px;
-  text-align: right;
-}
-
-.canvas-container {
-  display: flex;
-  align-items: center;
+  color: var(--red);
 }
 
 p {
   color: hsl(0, 39%, 23%);
 }
 
-.menu-icon {
-  display: block;
-}
-.sub-menu {
-  margin-left: 0px;
-  margin-right: 0;
-  padding: 0px;
-}
-.menu-list {
-  list-style: none;
-  display: none;
-  flex-direction: column;
-  position: absolute;
-  top: 40px;
-  left: -240px;
-  width: 240px;
-  padding: 0px;
-  margin: 0;
-  background-color: #eee;
-}
-
-.menu-list.active {
-  display: flex;
-}
-
-.menu-list li {
-  margin-top: 5px;
-  margin-left: 5px;
-  margin-right: 10px;
-  margin-bottom: 5px;
-  list-style: none;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-/* Styling for the label */
-.menu-list label {
-  display: flex;
-  align-items: center;
-  margin-right: 30px;
-}
-.menu-list span {
-  align-items: center;
-  color: gray;
-}
-
-.reset-button {
-  cursor: pointer;
-  background-color: #437e51;
-  color: #fff;
-
-  border: none;
-  border-radius: 5px;
-  font-size: 1em;
-  padding: 5px 10px;
-  margin-top: 0px;
-  margin-left: 0px;
-  margin-right: 10px;
-  margin-bottom: 2px;
-}
-
-.regular-button {
-  cursor: pointer;
-  border: none;
-  border-radius: 5px;
-  font-size: 1em;
-  padding: 5px 10px;
-  margin-top: 0px;
-  margin-left: 0px;
-  margin-right: 10px;
-  margin-bottom: 2px;
-}
+/* ---------- Menu ---------- */
 
 nav {
-  position: fixed;
-  top: 5px;
-  right: 10px;
+  flex: none;
+  position: relative;
   z-index: 1000;
 }
 
-.invisible-div {
-  height: 10px;
-  visibility: hidden;
+.menu-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  font-size: 24px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #333;
+  cursor: pointer;
 }
 
-header {
+.menu-icon:hover,
+.menu-icon[aria-expanded="true"] {
+  background: #eee;
+}
+
+.menu-list {
+  display: none;
+  position: absolute;
+  top: 48px;
+  right: 0;
+  width: 250px;
+  max-height: calc(100dvh - 70px);
+  overflow-y: auto;
+  background-color: #eee;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  padding: 6px 0;
+}
+
+.menu-list.active {
+  display: block;
+}
+
+.sub-menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.menu-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+}
+
+.menu-list label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.menu-list input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--green);
+}
+
+.menu-list .key {
+  color: gray;
+  font-size: 0.9em;
+}
+
+/* Keyboard shortcut hints are pointless on touch-only devices */
+@media (hover: none) {
+  .menu-list .key {
+    display: none;
+  }
+}
+
+.regular-button,
+.reset-button {
+  flex: 1;
+  cursor: pointer;
+  border: none;
+  border-radius: 6px;
+  font-size: 1em;
+  min-height: 38px;
+  padding: 5px 10px;
+  text-align: left;
+}
+
+.regular-button {
+  background: transparent;
+}
+
+.regular-button:hover {
+  background: #ddd;
+}
+
+.reset-button {
+  background-color: var(--green-dark);
   color: #fff;
-  padding: 10px;
   text-align: center;
+}
+
+/* ---------- Edit-mode toolbar ---------- */
+
+.toolbar {
+  flex: none;
   display: flex;
-  justify-content: space-between; /* Space between logo and title */
-  align-items: center;
+  gap: 4px;
+  margin: 0 10px 6px;
+  padding: 3px;
+  background: #eee;
+  border-radius: 10px;
 }
 
-.logo-container {
+.toolbar .mode {
+  flex: 1;
   display: flex;
   align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #444;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-.logo-link {
-  display: inline-block;
+.toolbar .mode svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.logo-img {
-  max-width: 100%;
-  height: auto;
+.toolbar .mode.active {
+  background: #fff;
+  color: var(--green);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
-.title {
-  margin-left: 20px; /* Adjust as needed for spacing between logo and title */
+/* ---------- Section panels ---------- */
+
+main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  padding: 0 10px 10px;
 }
 
-/* Styling for the pop-up panel */
+.panel {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.panel canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* We handle all gestures ourselves: no scrolling, zooming or double-tap zoom */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.domain-label {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  z-index: 1;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--red);
+  font-weight: bold;
+  font-size: 13px;
+  pointer-events: none;
+}
+
+/* Landscape phones: shrink the chrome so the sections get the room */
+@media (max-height: 500px) {
+  header {
+    padding: 4px 10px;
+  }
+
+  .logo-img {
+    height: 28px;
+  }
+
+  .toolbar .mode {
+    min-height: 34px;
+  }
+}
+
+@media (max-width: 480px) {
+  h1 {
+    font-size: 16px;
+  }
+
+  .logo-img {
+    height: 30px;
+  }
+}
+
+/* ---------- Help pop-up ---------- */
+
 #helpPanel {
   display: none;
   position: fixed;
-
-  padding-left: 30px;
-  padding-top: 30px;
-  padding-right: 20px;
-  padding-bottom: 10px;
-  background-color: #f1f1f1;
-  border: 1px solid #ccc;
-  z-index: 1;
-
-  top: 50px;
-  right: 0;
-  width: 300px; /* Adjust the width as needed */
+  top: 60px;
+  right: 10px;
+  left: auto;
+  width: min(340px, calc(100vw - 20px));
+  max-height: calc(100dvh - 80px);
+  overflow-y: auto;
+  padding: 24px 20px 10px 24px;
+  background-color: var(--panel-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  z-index: 1001;
 }
 
 .helpList {
-  padding: 0px;
-  margin: 0px;
+  padding-left: 18px;
+  margin: 0;
+  line-height: 1.5;
 }
 
-/* Styling for the close button */
 .close {
   position: absolute;
-  top: 5px;
-  right: 10px;
+  top: 2px;
+  right: 4px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  font-size: 24px;
   cursor: pointer;
 }

@@ -1,70 +1,77 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
     <title>Quiacito&trade; Demo Tool</title>
+    <meta name="description" content="Quiacito demo: see how flat hydrocarbon contacts in depth are not flat in time.">
+    <meta name="theme-color" content="#277a66">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
     <link rel="stylesheet" href="style.css" type="text/css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Exo:wght@400&display=swap" rel="stylesheet">
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-L7ND6GMCKM"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'G-L7ND6GMCKM');
+    </script>
 </head>
-
-<!--<body onload="init()"> -->
-
-    
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-L7ND6GMCKM"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-L7ND6GMCKM');
-</script>
 
 <body>
 
-
     <header>
-        <div class="logo-container">
-            <a href="https://www.qintegral.com.au/" class="logo-link">
-                <img src="https://www.qintegral.com.au/templates/g5_helium/custom/images/qintegral_web_top_logo_300px.jpg"
-                    alt="Logo" class="logo-img">
-            </a>
-        </div>
-        <div class="title">
-            <h1>Quiacito&trade; Demo Tool</h1>
-        </div>
+        <a href="https://www.qintegral.com.au/" class="logo-link">
+            <img src="https://www.qintegral.com.au/templates/g5_helium/custom/images/qintegral_web_top_logo_300px.jpg"
+                alt="Qintegral" class="logo-img">
+        </a>
+        <h1>Quiacito&trade; Demo Tool</h1>
+
+        <nav>
+            <button class="menu-icon" aria-label="Menu" aria-expanded="false">&#9776;</button>
+            <div class="menu-list">
+                <ul class="sub-menu">
+                    <li><label><input type="checkbox" id="gasA"> Gas A</label><span class="key">1</span></li>
+                    <li><label><input type="checkbox" id="oilA"> Oil A</label><span class="key">2</span></li>
+                    <li><label><input type="checkbox" id="resA"> Restrict A</label><span class="key">3</span></li>
+                    <li><label><input type="checkbox" id="gasB"> Gas B</label><span class="key">4</span></li>
+                    <li><label><input type="checkbox" id="oilB"> Oil B</label><span class="key">5</span></li>
+                    <li><label><input type="checkbox" id="resB"> Restrict B</label><span class="key">6</span></li>
+                    <li><label><input type="checkbox" id="layerNames" checked> Show Layer Names</label><span class="key">L</span></li>
+                    <li><label><input type="checkbox" id="showHC" checked> Show Hydrocarbons</label><span class="key">H</span></li>
+                    <li><button class="regular-button" id="help">Help...</button></li>
+                    <li><button class="reset-button" id="reset">Reset</button></li>
+                </ul>
+            </div>
+        </nav>
     </header>
 
-
-
-    <nav>
-        <div class="menu-icon">&#9776;</div>
-        <ul class="menu-list">
-            <ul class="sub-menu">
-                <li><label><input type="checkbox" id="gasA"> Gas A</label><span>1</span></li>
-                <li><label><input type="checkbox" id="oilA"> Oil A</label><span>2</span></li>
-                <li><label><input type="checkbox" id="resA"> Restrict A</label><span>3</span></li>
-                <li><label><input type="checkbox" id="gasB"> Gas B</label><span>4</span></li>
-                <li><label><input type="checkbox" id="oilB"> Oil B</label><span>5</span></li>
-                <li><label><input type="checkbox" id="resB"> Restrict B</label><span>6</span></li>
-                <li><label><input type="checkbox" id="layerNames" checked> Show Layer Names</label><span>L</span></li>
-                <li><label><input type="checkbox" id="showHC" checked> Show Hydrocarbons</label> <span>H</span></li>
-                <li class="regular-button" id="help">Help...</li>
-                <li class="reset-button" id="reset">Reset</li>
-            </ul>
-        </ul>
-    </nav>
-
+    <!-- Edit mode: replaces Ctrl / Shift+Ctrl on touch screens (modifiers still work with a mouse) -->
+    <div class="toolbar" role="radiogroup" aria-label="Edit mode">
+        <button class="mode active" data-mode="draw" role="radio" aria-checked="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 16c3-6 5-6 7-2s4 4 7-3 4-2 4-2" /></svg>Draw
+        </button>
+        <button class="mode" data-mode="flat" role="radio" aria-checked="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18" /><path d="M3 8v8M21 8v8" /></svg>Flat
+        </button>
+        <button class="mode" data-mode="move" role="radio" aria-checked="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4" /></svg>Move layer
+        </button>
+    </div>
 
     <!-- Pop-up panel with help text -->
-    <div id="helpPanel">
+    <div id="helpPanel" role="dialog" aria-label="Help">
         <div id="helpContent">
-            <span class="close" id="closeHelp">&times;</span>
+            <button class="close" id="closeHelp" aria-label="Close">&times;</button>
 
             <p>Quiacito&trade; Demo Tool is a fun thing to show how "flat spots" are not flat!</p>
             <p>There are 2 panels. The top panel shows a TIME section, such as interpreted seismic, the bottom panel is
@@ -74,64 +81,61 @@
                 dramatic.</p>
 
             <ul class="helpList">
-
-                <li><label>Edit layers in TIME or DEPTH panels with mouse</label></li>
-                <li><label>Mouse +Ctrl for flat layers</label></li>
-                <li><label>Mouse +Shift+Ctrl moves whole layer</label></li>
-                <li><label>Checkboxes for hydrocarbons</label></li>
-                <li><label>Checkboxes restricting hyrocarbon extents</label></li>
-                <li><label>Make section wider by unchecking "Show Layer Names"</label></li>
-                <li><label>"Reset" to start over</label></li>
+                <li>Drag a layer in the TIME or DEPTH panel to edit it</li>
+                <li><b>Draw</b> mode follows your finger or mouse</li>
+                <li><b>Flat</b> mode draws flat sections (or hold Ctrl)</li>
+                <li><b>Move layer</b> shifts the whole layer (or hold Shift+Ctrl)</li>
+                <li>Use the &#9776; menu to add hydrocarbons and restrict their extents</li>
+                <li>Make the section wider by unchecking "Show Layer Names"</li>
+                <li>"Reset" to start over</li>
             </ul>
             <p>Have fun! <span style="font-size: 24px;">😊</span></p>
         </div>
     </div>
-    <!--
-       <p>Edit layers in TIME or DEPTH panels with mouse. +Ctrl for flat layers, +Shift+Ctrl moves whole layer.</p>
 
-   -->
-    <h4 class="domain-h4">TIME</h4>
-    <canvas id="canvasTime"></canvas>
-
-    <div class="invisible-div"></div>
-
-    <h4 class="domain-h4">DEPTH</h4>
-    <canvas id="canvasDepth"></canvas>
-
-
-
-
+    <main>
+        <section class="panel">
+            <span class="domain-label">TIME</span>
+            <canvas id="canvasTime"></canvas>
+        </section>
+        <section class="panel">
+            <span class="domain-label">DEPTH</span>
+            <canvas id="canvasDepth"></canvas>
+        </section>
+    </main>
 
     <script type="module">
-        import { changedHydrocarbon } from './script.js';
-        import { changedCompartment } from './script.js';
-        import { toggleMenu } from './script.js';
-        import { dismissMenu } from './script.js';
-        import { resetSection } from './script.js';
-        import { checkboxChanged } from './script.js';
+        import { toggleMenu, dismissMenu, resetSection, checkboxChanged, setEditMode } from './script.js';
 
-        document.querySelector('.menu-icon').addEventListener('click', toggleMenu);
-        document.querySelector('.reset-button').addEventListener('click', resetSection);
+        const menuBtn = document.querySelector('.menu-icon');
+        const menu = document.querySelector('.menu-list');
+        menuBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleMenu(); });
+        menu.addEventListener('click', (e) => e.stopPropagation());
+        document.addEventListener('click', dismissMenu); // tap outside closes the menu
 
-        // Add event listener to all checkboxes during initialization
+        document.getElementById('reset').addEventListener('click', resetSection);
+
         document.querySelectorAll('.sub-menu input').forEach(function (checkbox) {
             checkbox.addEventListener('change', checkboxChanged);
         });
 
+        document.querySelectorAll('.toolbar .mode').forEach(function (btn) {
+            btn.addEventListener('click', () => setEditMode(btn.dataset.mode));
+        });
+
+        const helpPanel = document.getElementById('helpPanel');
         document.getElementById('help').addEventListener('click', function () {
-            // Show the help panel when the "Help" button is clicked
-            document.getElementById('helpPanel').style.display = 'block';
+            helpPanel.style.display = 'block';
             dismissMenu();
         });
         document.getElementById('closeHelp').addEventListener('click', function () {
-            // Close the help panel when the close button is clicked
-            document.getElementById('helpPanel').style.display = 'none';
+            helpPanel.style.display = 'none';
         });
 
-
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+        }
     </script>
-
-
 
 </body>
 
